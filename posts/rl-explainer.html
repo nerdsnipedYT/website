@@ -64,9 +64,11 @@ article .contents a::before{content:counter(c) ". ";color:var(--accent);font-wei
 @media(max-width:680px){article .contents ol{columns:1}}
 /* desktop: float the table of contents into a sticky side column */
 @media(min-width:1200px){
-  article .contents{position:fixed;top:88px;left:max(20px,calc(50vw - 596px));width:208px;margin:0;padding:14px 16px;max-height:calc(100vh - 116px);overflow:auto}
+  article .contents{position:fixed;top:88px;left:max(20px,calc(50vw - 600px));width:212px;margin:0;padding:16px 18px;max-height:calc(100vh - 116px);overflow:auto}
+  article .contents .lbl{margin-bottom:11px}
   article .contents ol{columns:1}
-  article .contents a{font-size:13px}
+  article .contents li{margin:12px 0}
+  article .contents a{font-size:13px;line-height:1.4}
 }
 
 /* reset block children that live inside narrow containers */
