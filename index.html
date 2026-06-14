@@ -35,7 +35,7 @@
       <div id="tagbar" class="tagbar"></div>
     </div>
     <div id="cards">
-    <a class="card" href="posts/figgie-rl.html" data-tags="reinforcement learning|self-play|transformers|games">
+    <a class="card" href="posts/figgie-rl.html" data-date="2026-06" data-tags="reinforcement learning|self-play|transformers|games">
       <img class="thumb" src="assets/figgie_thumb.webp" alt="Figgie poker chips" style="object-fit:cover;padding:0" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Build log · reinforcement learning</div>
@@ -45,7 +45,7 @@
         <div class="tags"><span class="tag-chip" data-tag="reinforcement-learning">reinforcement learning</span><span class="tag-chip" data-tag="self-play">self-play</span><span class="tag-chip" data-tag="transformers">transformers</span><span class="tag-chip" data-tag="games">games</span></div>
       </div>
     </a>
-    <a class="card" href="posts/rl-explainer.html" data-tags="reinforcement learning|theory|tutorial">
+    <a class="card" href="posts/rl-explainer.html" data-date="2026-06" data-tags="reinforcement learning|theory|tutorial">
       <img class="thumb" src="assets/thumb_rl.svg" alt="Gradient ascent climbing a loss landscape toward the optimal policy" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Explainer · reinforcement learning</div>
@@ -55,7 +55,7 @@
         <div class="tags"><span class="tag-chip" data-tag="reinforcement-learning">reinforcement learning</span><span class="tag-chip" data-tag="theory">theory</span><span class="tag-chip" data-tag="tutorial">tutorial</span></div>
       </div>
     </a>
-    <a class="card" href="posts/dynamic-reweighting.html" data-tags="generalization|computer vision|self-supervised">
+    <a class="card" href="posts/dynamic-reweighting.html" data-date="2026-06" data-tags="generalization|computer vision|self-supervised">
       <img class="thumb" src="assets/thumb_reweight.svg" alt="UMAP scatter: a dense memorized majority island and sparse rare-class points" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Experiment · generalization</div>
@@ -65,17 +65,7 @@
         <div class="tags"><span class="tag-chip" data-tag="generalization">generalization</span><span class="tag-chip" data-tag="computer-vision">computer vision</span><span class="tag-chip" data-tag="self-supervised">self-supervised</span></div>
       </div>
     </a>
-    <a class="card" href="posts/ants-on-a-stick.html" data-tags="recreational math|puzzles|combinatorics">
-      <img class="thumb" src="assets/ants_cover.png" alt="Ten ants on a floating stick with their crossing world-lines" style="object-fit:cover;padding:0" loading="lazy">
-      <div class="cardbody">
-        <div class="kicker">Puzzle · recreational math</div>
-        <h2>A puzzle about ants on a floating stick</h2>
-        <p>Ten ants walk along a floating stick, bouncing off each other and dropping off the ends. How many collisions before they all fall? Careful counting gives 25 — but one change of perspective (let the ants pass through each other like ghosts) makes it obvious, and cracks the hard asymmetric version for free.</p>
-        <div class="meta">June 2022 · ~6 min read · a math riddle</div>
-        <div class="tags"><span class="tag-chip" data-tag="recreational-math">recreational math</span><span class="tag-chip" data-tag="puzzles">puzzles</span><span class="tag-chip" data-tag="combinatorics">combinatorics</span></div>
-      </div>
-    </a>
-    <a class="card" href="posts/minecraft-sphere.html" data-tags="game dev|voxels|computational geometry">
+    <a class="card" href="posts/minecraft-sphere.html" data-date="2023-03" data-tags="game dev|voxels|computational geometry">
       <img class="thumb" src="assets/mc_cover.png" alt="A spherical voxel planet — 'WAIT… IT CURVES??'" style="object-fit:cover;padding:0" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Devlog · game development</div>
@@ -83,6 +73,16 @@
         <p>I built a Minecraft clone from scratch in Unity — except the world is a planet, a real sphere made of voxels. The geometry that lets cubes tile a sphere, the surprisingly hard spherical chunking system, the features, and the cursed finale: building a cube inside spherical Minecraft.</p>
         <div class="meta">March 2023 · ~8 min read · indie devlog</div>
         <div class="tags"><span class="tag-chip" data-tag="game-dev">game dev</span><span class="tag-chip" data-tag="voxels">voxels</span><span class="tag-chip" data-tag="computational-geometry">computational geometry</span></div>
+      </div>
+    </a>
+    <a class="card" href="posts/ants-on-a-stick.html" data-date="2022-06" data-tags="recreational math|puzzles|combinatorics">
+      <img class="thumb" src="assets/ants_cover.png" alt="Ten ants on a floating stick with their crossing world-lines" style="object-fit:cover;padding:0" loading="lazy">
+      <div class="cardbody">
+        <div class="kicker">Puzzle · recreational math</div>
+        <h2>A puzzle about ants on a floating stick</h2>
+        <p>Ten ants walk along a floating stick, bouncing off each other and dropping off the ends. How many collisions before they all fall? Careful counting gives 25 — but one change of perspective (let the ants pass through each other like ghosts) makes it obvious, and cracks the hard asymmetric version for free.</p>
+        <div class="meta">June 2022 · ~6 min read · a math riddle</div>
+        <div class="tags"><span class="tag-chip" data-tag="recreational-math">recreational math</span><span class="tag-chip" data-tag="puzzles">puzzles</span><span class="tag-chip" data-tag="combinatorics">combinatorics</span></div>
       </div>
     </a>
     </div>
@@ -106,6 +106,6 @@
   if(document.readyState!=="loading") init(); else document.addEventListener("DOMContentLoaded", init);
 })();
 </script>
-<script src="js/search.js?v=1"></script>
+<script src="js/search.js?v=2"></script>
 </body>
 </html>

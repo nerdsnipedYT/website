@@ -16,6 +16,12 @@
     return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
   }
 
+  // sort newest-first by data-date (stable for equal dates -> keeps DOM order)
+  cards.map(function (c, i) { return { c: c, d: c.getAttribute('data-date') || '', i: i }; })
+    .sort(function (a, b) { return a.d < b.d ? 1 : a.d > b.d ? -1 : a.i - b.i; })
+    .forEach(function (o) { wrap.appendChild(o.c); });
+  cards = [].slice.call(wrap.querySelectorAll('.card'));
+
   var items = cards.map(function (c) {
     var tags = (c.getAttribute('data-tags') || '').split('|')
       .map(function (x) { return x.trim(); }).filter(Boolean);
