@@ -59,8 +59,15 @@ article .contents ol{margin:0;padding-left:0;list-style:none;counter-reset:c;col
 article .contents li{margin:3px 0;counter-increment:c}
 article .contents a{color:var(--soft);font-size:14px;text-decoration:none;border:none}
 article .contents a:hover{color:var(--accent)}
+article .contents a.active{color:var(--accent);font-weight:700}
 article .contents a::before{content:counter(c) ". ";color:var(--accent);font-weight:700}
 @media(max-width:680px){article .contents ol{columns:1}}
+/* desktop: float the table of contents into a sticky side column */
+@media(min-width:1200px){
+  article .contents{position:fixed;top:88px;left:max(20px,calc(50vw - 596px));width:208px;margin:0;padding:14px 16px;max-height:calc(100vh - 116px);overflow:auto}
+  article .contents ol{columns:1}
+  article .contents a{font-size:13px}
+}
 
 /* reset block children that live inside narrow containers */
 article .box p,article .box ul,article .box ol,article details .inner p,article details .inner ul,article details .inner ol,article td p,article li p{max-width:none;margin-left:0;margin-right:0;padding-left:0;padding-right:0}
@@ -863,6 +870,23 @@ avg_strategy_net = train_from_scratch(M_pi, weight_by=t)        <span class="c">
 </footer>
 
 <script>
+// scroll-spy: highlight the current section in the side contents nav
+(function(){
+  var links=[].slice.call(document.querySelectorAll('.contents a'));
+  var map={};
+  links.forEach(function(a){ var id=a.getAttribute('href').slice(1); var s=document.getElementById(id); if(s) map[id]=a; });
+  var secs=Object.keys(map).map(function(id){ return document.getElementById(id); });
+  if(!secs.length || !('IntersectionObserver' in window)) return;
+  var obs=new IntersectionObserver(function(entries){
+    entries.forEach(function(e){
+      if(e.isIntersecting){
+        links.forEach(function(l){ l.classList.remove('active'); });
+        var a=map[e.target.id]; if(a) a.classList.add('active');
+      }
+    });
+  },{rootMargin:'-12% 0px -75% 0px',threshold:0});
+  secs.forEach(function(s){ obs.observe(s); });
+})();
 // theme toggle (shared with the rest of the site)
 (function(){
   var KEY='nerdsniped-theme';
