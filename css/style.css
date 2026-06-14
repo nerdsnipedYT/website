@@ -131,7 +131,39 @@ footer.site{border-top:1px solid var(--line);padding:30px 0 50px;color:var(--fai
 .katex-display{margin:24px 0;overflow-x:auto;overflow-y:hidden}
 
 @media(max-width:680px){
-  body{font-size:18px}
-  h1.title{font-size:32px}.hero h1{font-size:34px}
-  article h2{font-size:23px}
+  body{font-size:17px}
+  .wrap{padding:0 18px}
+  /* header stays one tidy row */
+  header.site .wrap{height:54px}
+  .brand{font-size:16.5px}
+  .brandlogo{width:24px;height:24px;margin-right:8px}
+  header.site nav a{font-size:13px;margin-left:14px}
+  .themebtn{margin-left:12px;padding:5px 9px;font-size:13px}
+  /* reading column */
+  h1.title{font-size:30px}
+  .hero{padding:44px 0 22px}
+  .hero h1{font-size:34px}.hero p{font-size:18px}
+  article{padding:28px 0 54px}
+  article h2{font-size:22px}
+  article h3{font-size:18px}
+  .post-head,article p,article ul,article ol,article h2,article h3,article blockquote{padding-left:18px;padding-right:18px}
+  article p,article li,article h2,article h3{overflow-wrap:break-word}
+  .byline{gap:9px;font-size:13px}
+  .aside{margin-left:18px;margin-right:18px;padding:14px 16px}
+  figure{padding:0 14px}
+  pre{padding:0 14px}
+  .kpis{gap:10px}
+  .kpi{min-width:calc(50% - 5px);padding:12px 14px}
+  .kpi .v{font-size:23px}
+  .card{padding:20px 20px}
+  .tbl-wrap{padding:0 14px}
+}
+@media(max-width:380px){
+  .wrap{padding:0 14px}
+  .brand{font-size:15px}
+  .brandlogo{width:22px;height:22px;margin-right:7px}
+  header.site nav a{font-size:12px;margin-left:10px}
+  .themebtn{margin-left:9px;padding:4px 8px;font-size:12px}
+  h1.title{font-size:26px}.hero h1{font-size:30px}
+  .kpi .v{font-size:21px}
 }

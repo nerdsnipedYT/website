@@ -104,6 +104,23 @@ article hr.soft{max-width:var(--maxw)}
 /* MathJax: inherit text colour so equations read on dark */
 mjx-container{color:var(--ink)!important;overflow-x:auto;overflow-y:hidden;max-width:100%}
 article .col{max-width:none;padding:0}
+
+/* ── phones ── */
+@media(max-width:680px){
+  article .h2num{padding-left:18px;padding-right:18px}
+  article h4{padding-left:18px;padding-right:18px}
+  article .lede{font-size:19px;padding-left:18px;padding-right:18px}
+  article .readbar{gap:14px;padding-left:18px;padding-right:18px}
+  article .contents{margin-left:18px;margin-right:18px;padding:14px 16px}
+  article .contents ol{columns:1}
+  article .box{margin-left:18px;margin-right:18px;padding:14px 16px;font-size:15.5px}
+  article details{margin-left:18px;margin-right:18px}
+  article details .inner{padding:4px 16px 12px;font-size:15.5px}
+  article figure{padding:0 14px}
+  /* wide derivation tables: scroll inside the column instead of stretching the page */
+  article table{display:block;width:max-content;max-width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;font-size:13.5px}
+  article th,article td{padding:7px 10px}
+}
 </style>
 </head>
 <body>
