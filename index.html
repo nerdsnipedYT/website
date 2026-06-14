@@ -9,14 +9,15 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=3">
+<link rel="stylesheet" href="css/style.css?v=4">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
 </head>
 <body>
 <header class="site">
   <div class="wrap">
     <a class="brand" href="index.html"><img class="brandlogo" src="assets/yt_logo.jpg" alt="nerdsniped logo">Nerd<span>sniped</span></a>
-    <nav class="sans"><a href="index.html">Blog</a><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
+    <input id="search" class="navsearch" type="search" placeholder="Search posts…" aria-label="Search posts" autocomplete="off">
+    <nav class="sans"><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
   </div>
 </header>
 
@@ -30,10 +31,7 @@
 
 <section class="postlist">
   <div class="wrap">
-    <div class="filters">
-      <div class="searchbox"><input id="search" type="search" placeholder="Search posts…" aria-label="Search posts" autocomplete="off"></div>
-      <div id="tagbar" class="tagbar"></div>
-    </div>
+    <div id="activefilter" class="activefilter" hidden></div>
     <div id="cards">
     <a class="card" href="posts/figgie-rl.html" data-date="2026-06" data-tags="reinforcement learning|self-play|transformers|games">
       <img class="thumb" src="assets/figgie_thumb.webp" alt="Figgie poker chips" style="object-fit:cover;padding:0" loading="lazy">
@@ -106,6 +104,6 @@
   if(document.readyState!=="loading") init(); else document.addEventListener("DOMContentLoaded", init);
 })();
 </script>
-<script src="js/search.js?v=2"></script>
+<script src="js/search.js?v=3"></script>
 </body>
 </html>

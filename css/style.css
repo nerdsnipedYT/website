@@ -128,15 +128,18 @@ table.res .hi{color:var(--accent2);font-weight:700}
 .card p{color:var(--soft);font-size:17px;margin:0}
 .card .meta{font-family:Inter,sans-serif;color:var(--faint);font-size:13px;margin-top:14px}
 
-/* search + tag filtering */
-.filters{display:flex;flex-wrap:wrap;gap:12px 18px;align-items:center;margin:0 0 14px}
-.searchbox{position:relative;flex:1;min-width:240px}
-#search{width:100%;font-family:Inter,sans-serif;font-size:15px;color:var(--ink);background:var(--surface);
-  border:1px solid var(--line);border-radius:10px;padding:11px 14px 11px 38px;transition:border-color .15s}
-#search:focus{outline:none;border-color:var(--accent)}
-#search::placeholder{color:var(--faint)}
-.searchbox::before{content:"⌕";position:absolute;left:13px;top:50%;transform:translateY(-50%);color:var(--faint);font-size:18px;pointer-events:none}
-.tagbar{display:flex;flex-wrap:wrap;gap:8px}
+/* search box, in the top bar (index) */
+.navsearch{flex:1;min-width:0;max-width:320px;margin:0 16px;font-family:Inter,sans-serif;font-size:14px;color:var(--ink);
+  background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:8px 12px;transition:border-color .15s}
+.navsearch:focus{outline:none;border-color:var(--accent)}
+.navsearch::placeholder{color:var(--faint)}
+/* on small screens the search owns the bar: drop the text links, keep the theme toggle */
+@media(max-width:560px){.navsearch{margin:0 10px}.navsearch + nav a{display:none}}
+/* active-tag-filter indicator — only visible once a tag is clicked */
+.activefilter{display:flex;align-items:center;gap:9px;font-family:Inter,sans-serif;font-size:13.5px;color:var(--soft);margin:0 0 16px}
+.activefilter button{font-family:Inter,sans-serif;cursor:pointer;background:var(--surface);border:1px solid var(--accent);color:var(--accent);
+  border-radius:20px;padding:4px 12px;font-size:12.5px;display:inline-flex;align-items:center;gap:7px;transition:.12s}
+.activefilter button:hover{background:var(--accent);color:#fff}
 .tag-chip{font-family:Inter,sans-serif;font-size:12.5px;line-height:1.3;color:var(--soft);background:var(--surface);
   border:1px solid var(--line);border-radius:20px;padding:5px 12px;cursor:pointer;text-decoration:none;display:inline-block;transition:.12s;white-space:nowrap}
 .tag-chip:hover{border-color:var(--accent);color:var(--accent)}

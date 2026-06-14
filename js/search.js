@@ -11,6 +11,7 @@
   var searchEl = document.getElementById('search');
   var tagbar = document.getElementById('tagbar');
   var noresults = document.getElementById('noresults');
+  var activefilter = document.getElementById('activefilter');
 
   function slug(s) {
     return s.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
@@ -30,6 +31,9 @@
       tagslugs: tags.map(slug), text: (c.textContent || '').toLowerCase(), body: ''
     };
   });
+
+  var tagLabel = {};
+  items.forEach(function (it) { it.tags.forEach(function (t) { tagLabel[slug(t)] = t; }); });
 
   var state = { q: '', tag: '' };
   try { state.tag = new URLSearchParams(location.search).get('tag') || ''; } catch (e) {}
@@ -77,6 +81,20 @@
     if (tagbar) [].slice.call(tagbar.children).forEach(function (b) {
       b.classList.toggle('active', (b.dataset.tag || '') === state.tag);
     });
+    if (activefilter) {
+      if (state.tag) {
+        var label = (tagLabel[state.tag] || state.tag).replace(/</g, '&lt;');
+        activefilter.innerHTML = '';
+        var lbl = document.createElement('span'); lbl.textContent = 'Filtered by tag:';
+        var btn = document.createElement('button'); btn.type = 'button'; btn.title = 'Clear filter';
+        btn.innerHTML = label + ' <span aria-hidden="true">✕</span>';
+        btn.addEventListener('click', function () { setTag(''); });
+        activefilter.appendChild(lbl); activefilter.appendChild(btn);
+        activefilter.hidden = false;
+      } else {
+        activefilter.hidden = true; activefilter.innerHTML = '';
+      }
+    }
     try {
       var u = new URL(location.href);
       if (state.tag) u.searchParams.set('tag', state.tag); else u.searchParams.delete('tag');
