@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=2">
+<link rel="stylesheet" href="css/style.css?v=3">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
 </head>
 <body>
@@ -30,33 +30,43 @@
 
 <section class="postlist">
   <div class="wrap">
-    <a class="card" href="posts/figgie-rl.html">
+    <div class="filters">
+      <div class="searchbox"><input id="search" type="search" placeholder="Search posts…" aria-label="Search posts" autocomplete="off"></div>
+      <div id="tagbar" class="tagbar"></div>
+    </div>
+    <div id="cards">
+    <a class="card" href="posts/figgie-rl.html" data-tags="reinforcement learning|self-play|transformers|games">
       <img class="thumb" src="assets/figgie_thumb.webp" alt="Figgie poker chips" style="object-fit:cover;padding:0" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Build log · reinforcement learning</div>
         <h2>I tried to build a superhuman Figgie bot</h2>
         <p>I wanted a self-play RL agent that crushes everyone at Jane Street's card game Figgie. This is the build log: encoding the order book as tokens, a transformer that learns from nothing but chips, PPO that actually out-trades a Bayesian heuristic, and Deep CFR that fought me the whole way. Not superhuman yet — but with interactive learning curves and an honest scoreboard of how far I got.</p>
         <div class="meta">June 2026 · ~15 min read · self-play RL</div>
+        <div class="tags"><span class="tag-chip" data-tag="reinforcement-learning">reinforcement learning</span><span class="tag-chip" data-tag="self-play">self-play</span><span class="tag-chip" data-tag="transformers">transformers</span><span class="tag-chip" data-tag="games">games</span></div>
       </div>
     </a>
-    <a class="card" href="posts/rl-explainer.html">
+    <a class="card" href="posts/rl-explainer.html" data-tags="reinforcement learning|theory|tutorial">
       <img class="thumb" src="assets/thumb_rl.svg" alt="Gradient ascent climbing a loss landscape toward the optimal policy" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Explainer · reinforcement learning</div>
         <h2>From the policy gradient theorem to PPO, GRPO &amp; CFR</h2>
         <p>The theory companion to the Figgie build log: a self-contained, first-principles derivation of the algorithms that actually train a self-play agent. REINFORCE → actor–critic &amp; GAE → PPO → GRPO → counterfactual regret minimisation &amp; Deep CFR — every formula cashed out on the real game, with collapsible derivations.</p>
         <div class="meta">June 2026 · ~45 min read · a guided derivation</div>
+        <div class="tags"><span class="tag-chip" data-tag="reinforcement-learning">reinforcement learning</span><span class="tag-chip" data-tag="theory">theory</span><span class="tag-chip" data-tag="tutorial">tutorial</span></div>
       </div>
     </a>
-    <a class="card" href="posts/dynamic-reweighting.html">
+    <a class="card" href="posts/dynamic-reweighting.html" data-tags="generalization|computer vision|self-supervised">
       <img class="thumb" src="assets/thumb_reweight.svg" alt="UMAP scatter: a dense memorized majority island and sparse rare-class points" loading="lazy">
       <div class="cardbody">
         <div class="kicker">Experiment · generalization</div>
         <h2>Can a network tell you which examples it has already memorized?</h2>
         <p>A frozen random network, a chaser that learns to imitate it, and a surprisingly clean signal for "I've seen this enough." We use it to down-weight memorized examples and re-balance a lop-sided dataset — no labels required. With interactive UMAP explorers for MNIST and CIFAR-100.</p>
         <div class="meta">June 2026 · ~20 min read · MNIST &amp; CIFAR-100</div>
+        <div class="tags"><span class="tag-chip" data-tag="generalization">generalization</span><span class="tag-chip" data-tag="computer-vision">computer vision</span><span class="tag-chip" data-tag="self-supervised">self-supervised</span></div>
       </div>
     </a>
+    </div>
+    <p id="noresults" class="noresults" hidden>No posts match your search.</p>
   </div>
 </section>
 
@@ -76,5 +86,6 @@
   if(document.readyState!=="loading") init(); else document.addEventListener("DOMContentLoaded", init);
 })();
 </script>
+<script src="js/search.js?v=1"></script>
 </body>
 </html>

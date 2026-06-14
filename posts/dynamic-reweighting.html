@@ -12,7 +12,7 @@
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <link rel="icon" type="image/jpeg" href="../assets/yt_logo.jpg">
-<link rel="stylesheet" href="../css/style.css?v=2">
+<link rel="stylesheet" href="../css/style.css?v=3">
 <script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
 </head>
 <body>
@@ -30,6 +30,7 @@
     <div class="byline">
       <span>Nerdsniped</span><span class="dot">•</span><span>June 2026</span><span class="dot">•</span><span>~20 min read</span><span class="dot">•</span><span>MNIST &amp; CIFAR-100</span>
     </div>
+    <div class="tags"><a class="tag-chip" href="../index.html?tag=generalization">generalization</a><a class="tag-chip" href="../index.html?tag=computer-vision">computer vision</a><a class="tag-chip" href="../index.html?tag=self-supervised">self-supervised</a></div>
   </div>
 
   <p>Here is a shower-thought that refused to leave me alone. A neural network overfits by continuing to push the loss down on examples it has <em>already</em> gotten right — grinding a training point from 99% confidence to 99.9% confidence, learning nothing that generalizes, just memorizing harder. If only the network could raise its hand and say <em>"I've seen this one enough, stop wasting gradient on it"</em>, we could spend that capacity elsewhere and maybe overfit less.</p>
