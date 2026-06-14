@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nerdsniped — a research blog</title>
+<meta name="description" content="Deepdives into mathsy side quests — small, careful machine-learning experiments, written up with interactive figures. The written companion to the nerdsniped YouTube channel.">
+<link rel="icon" type="image/jpeg" href="assets/yt_logo.jpg">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="index.html"><img class="brandlogo" src="assets/yt_logo.jpg" alt="nerdsniped logo">Nerd<span>sniped</span></a>
+    <nav class="sans"><a href="index.html">Blog</a><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
+  </div>
+</header>
+
+<section class="hero">
+  <div class="wrap">
+    <h1>Nerdsniped.</h1>
+    <p><strong>nerdsnipe</strong> <em>(slang)</em> — to present someone with a very interesting problem to solve, distracting them from whatever they were doing previously.</p>
+    <p class="tagline"><span>📺 Deepdives into mathsy side quests</span><span class="dot">·</span><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">Watch on YouTube&nbsp;→</a></p>
+  </div>
+</section>
+
+<section class="postlist">
+  <div class="wrap">
+    <a class="card" href="posts/figgie-rl.html">
+      <div class="kicker">Build log · reinforcement learning</div>
+      <h2>I tried to build a superhuman Figgie bot</h2>
+      <p>I wanted a self-play RL agent that crushes everyone at Jane Street's card game Figgie. This is the build log: encoding the order book as tokens, a transformer that learns from nothing but chips, PPO that actually out-trades a Bayesian heuristic, and Deep CFR that fought me the whole way. Not superhuman yet — but with interactive learning curves and an honest scoreboard of how far I got.</p>
+      <div class="meta">June 2026 · ~15 min read · self-play RL</div>
+    </a>
+    <a class="card" href="posts/dynamic-reweighting.html">
+      <div class="kicker">Experiment · generalization</div>
+      <h2>Can a network tell you which examples it has already memorized?</h2>
+      <p>A frozen random network, a chaser that learns to imitate it, and a surprisingly clean signal for "I've seen this enough." We use it to down-weight memorized examples and re-balance a lop-sided dataset — no labels required. With interactive UMAP explorers for MNIST and CIFAR-100.</p>
+      <div class="meta">June 2026 · ~20 min read · MNIST &amp; CIFAR-100</div>
+    </a>
+  </div>
+</section>
+
+<footer class="site">
+  <div class="wrap">© 2026 Nerdsniped · built as a static site · figures are interactive (Plotly)</div>
+</footer>
+<script>
+(function(){
+  var KEY='nerdsniped-theme';
+  function cur(){ return localStorage.getItem(KEY)||'dark'; }
+  function set(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem(KEY,t);
+    var b=document.getElementById('themebtn'); if(b) b.textContent=(t==='dark'?'☀':'☾');
+  }
+  function init(){ set(cur()); var b=document.getElementById('themebtn'); if(b) b.addEventListener('click',function(){ set(cur()==='dark'?'light':'dark'); }); }
+  if(document.readyState!=="loading") init(); else document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
