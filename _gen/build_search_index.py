@@ -15,6 +15,7 @@ TAGS = {
     'figgie-rl.html':          ['reinforcement learning', 'self-play', 'transformers', 'games'],
     'rl-explainer.html':       ['reinforcement learning', 'theory', 'tutorial'],
     'dynamic-reweighting.html':['generalization', 'computer vision', 'self-supervised'],
+    'ants-on-a-stick.html':    ['recreational math', 'puzzles', 'combinatorics'],
 }
 
 

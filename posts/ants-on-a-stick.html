@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A puzzle about ants on a floating stick — Nerdsniped</title>
+<meta name="description" content="Ten ants walk along a floating stick, bouncing off each other and dropping off the ends. How many collisions before they all fall? A careful count gives 25 — but letting the ants pass through each other like ghosts makes it obvious, and solves the asymmetric version too.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="icon" type="image/jpeg" href="../assets/yt_logo.jpg">
+<link rel="stylesheet" href="../css/style.css?v=3">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><img class="brandlogo" src="../assets/yt_logo.jpg" alt="nerdsniped logo">Nerd<span>sniped</span></a>
+    <nav class="sans"><a href="../index.html">Blog</a><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
+  </div>
+</header>
+
+<article>
+  <div class="post-head">
+    <div class="kicker">Puzzle · recreational math</div>
+    <h1 class="title">A puzzle about ants on a floating stick</h1>
+    <div class="byline">
+      <span>Nerdsniped &amp; Nerdsniped</span><span class="dot">•</span><span>June 2022</span><span class="dot">•</span><span>~6 min read</span><span class="dot">•</span><span>a math riddle</span>
+    </div>
+    <div class="tags"><a class="tag-chip" href="../index.html?tag=recreational-math">recreational math</a><a class="tag-chip" href="../index.html?tag=puzzles">puzzles</a><a class="tag-chip" href="../index.html?tag=combinatorics">combinatorics</a></div>
+  </div>
+
+  <p>Hi :) We're Nerdsniped and Nerdsniped, from the maths degree at the FME. We wanted to use this little corner to show you one of our favourite problems. We love it because it has a beautifully elegant solution that is genuinely hard to come up with — and yet, once you see it, almost embarrassingly easy to understand.</p>
+
+  <p>It's a problem with two solutions. The first is the one almost everybody finds: careful counting and a bit of school algebra. The second is the one worth waiting for — a single change of perspective that makes the whole thing collapse into one line, and cracks a much harder version of the problem for free.</p>
+
+  <figure>
+    <img src="../assets/ants_cover.png" alt="Ten coloured ants standing on a floating stick, with their future paths drawn as crossing diagonal lines">
+    <figcaption><b>The whole puzzle in one picture.</b> Ten ants on a stick, and the trails they will trace out over time. By the end you'll know exactly why those trails are the key.</figcaption>
+  </figure>
+
+  <h2><span class="num">1</span>The riddle</h2>
+
+  <p>There is a tree branch floating in a swimming pool. Standing on the branch, in a line, there are <strong>10 ants</strong>. The <strong>5 leftmost</strong> are looking right, and the <strong>5 rightmost</strong> are looking left. In a moment they will all start walking, following three simple rules:</p>
+
+  <ol>
+    <li>Each ant <strong>walks in the direction it is facing</strong>, at the same constant speed.</li>
+    <li>When two ants <strong>meet, they both turn around</strong> and walk the other way (a collision).</li>
+    <li>If an ant <strong>walks off either end</strong> of the stick, it falls into the water and drowns.</li>
+  </ol>
+
+  <figure class="tight">
+    <img src="../assets/ants_setup.svg" alt="A stick over water with ten ants: the five on the left face right, the five on the right face left">
+    <figcaption><b>The starting line.</b> Five ants facing right (warm), five facing left (cool), all about to march.</figcaption>
+  </figure>
+
+  <p>The question is simple to state: <strong>how many ant-to-ant collisions happen in total</strong> before every ant has drowned?</p>
+
+  <p>This is a great moment to stop and try it yourself. If you'd rather watch us walk through it, here's the video — otherwise, scroll on for the two solutions.</p>
+
+  <!-- VIDEO: replace this placeholder with the embed once the link is ready, e.g.
+       <div style="position:relative;padding-top:56.25%">
+         <iframe style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:14px"
+                 src="https://www.youtube.com/embed/VIDEO_ID"
+                 title="A puzzle about ants on a floating stick" allowfullscreen></iframe>
+       </div>
+  -->
+  <figure>
+    <div style="position:relative;padding-top:56.25%;border:1px dashed var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--faint);font-family:Inter,sans-serif">
+        <div style="font-size:40px;line-height:1">▶</div>
+        <div style="font-size:15px;font-weight:600">Video coming soon</div>
+        <div style="font-size:12.5px">the animated walkthrough will live here</div>
+      </div>
+    </div>
+    <figcaption><b>Watch the puzzle in motion.</b> The full animated explanation will be embedded here shortly.</figcaption>
+  </figure>
+
+  <h2><span class="num">2</span>Solution 1 — count ant by ant</h2>
+
+  <p>The most intuitive approach is to count, for each ant, how many collisions it personally takes part in, and add them up. There's one subtlety: every collision involves <em>two</em> ants, so summing each ant's personal count counts every collision <strong>twice</strong>. If $C$ is the total number of collisions and $c_i$ is the number for ant $i$, then</p>
+
+  $$2C \;=\; \sum_{i=0}^{9} c_i.$$
+
+  <p>Now a useful observation: the starting position is perfectly <strong>symmetric</strong>, and the rules preserve that symmetry throughout the simulation. So the outermost-left ant has exactly as many collisions as the outermost-right one, the second-from-left as the second-from-right, and so on:</p>
+
+  $$c_0 = c_9,\quad c_1 = c_8,\quad c_2 = c_7,\quad \dots$$
+
+  <p>which means the sum over all ten ants is just twice the sum over the five on one side. The two's cancel, and we're left with something clean:</p>
+
+  $$C \;=\; \sum_{k=1}^{5} c_k \quad\text{(the five ants on one side).}$$
+
+  <p>The last step is to count those five. Walking inward from the edge:</p>
+  <ul>
+    <li>The <strong>1st</strong> ant (nearest the edge) bounces once off its neighbour and then inevitably falls off the near edge: <strong>1</strong> collision.</li>
+    <li>The <strong>2nd</strong> bounces, but there's still an ant behind it, so it gets turned around and bounces a second and third time before it drops: <strong>3</strong>.</li>
+    <li>The pattern continues — the $k$-th ant from the edge bounces $2k-1$ times.</li>
+  </ul>
+
+  <p>Adding up the five odd numbers gives the answer:</p>
+
+  $$C \;=\; 1 + 3 + 5 + 7 + 9 \;=\; 25.$$
+
+  <div class="aside sans"><span class="lbl">A free generalization</span>
+  This argument doesn't care that there were five ants per side. With $n$ ants on each side the total is $1+3+5+\cdots+(2n-1)$, and the sum of the first $n$ odd numbers is famously $n^2$. So <strong>$n$ per side gives $n^2$ collisions</strong> — here, $5^2 = 25$.</div>
+
+  <p>So far so good. But this solution has a real weakness. What if there are <em>more ants on one side than the other</em>? Then the symmetry is broken, the per-ant counts stop being a tidy run of odd numbers, and the whole bookkeeping falls apart. Solution 1 simply can't handle it. <em>(Pause here and try the asymmetric case — it's genuinely fiddly.)</em></p>
+
+  <h2><span class="num">3</span>Solution 2 — let them be ghosts</h2>
+
+  <p>Here is the change of perspective. When two ants collide, they turn around. But the ants are <strong>indistinguishable</strong> — every ant counts towards the total in exactly the same way. So when ant A and ant B meet and bounce, the picture is <em>identical</em> to one where they simply <strong>pass straight through each other</strong>, like ghosts, and keep going. The number of collisions doesn't change one bit; only the labels on the ants do.</p>
+
+  <p>Once you allow the ants to walk through each other, every trajectory becomes a <strong>straight line</strong> that never turns. Draw the picture in space and time — position across, time up — and each ant traces a perfectly straight world-line. A collision is exactly a point where two of these lines <strong>cross</strong>.</p>
+
+  <figure>
+    <img src="../assets/ants_spacetime.svg" alt="Space-time diagram: five straight lines going up-right and five going up-left; every right-going line crosses every left-going line once, for 25 crossings">
+    <figcaption><b>Ghosts make it obvious.</b> Position is horizontal, time is vertical. Right-walkers (warm) and left-walkers (cool) are now straight lines. Same-direction lines are parallel and never meet; each right-walker crosses each left-walker <em>exactly once</em>. Count the dots: 25.</figcaption>
+  </figure>
+
+  <p>Now the counting is trivial. Two ants only ever cross if they're walking <strong>towards</strong> each other — two ants going the same way are parallel and never meet. So if $a$ ants are walking right and $b$ ants are walking left, then <strong>every right-walker crosses every left-walker exactly once</strong>, and the total number of collisions is simply</p>
+
+  $$C \;=\; a \cdot b.$$
+
+  <p>For our puzzle, $a = b = 5$, giving $5 \cdot 5 = 25$ — matching solution 1. But look what we got for free: the <strong>asymmetric case that defeated solution 1 is now immediate</strong>. Three ants heading right into seven heading left? $3 \cdot 7 = 21$ collisions. No casework, no symmetry, no sum of odd numbers — just one product.</p>
+
+  <div class="aside sans"><span class="lbl">The one-line takeaway</span>
+  Bouncing ants and pass-through "ghost" ants produce the exact same number of collisions, because the ants are interchangeable. In the ghost world every path is a straight line, a collision is a crossing, and opposite-facing pairs cross exactly once — so the answer is just <strong>(number going one way) × (number going the other)</strong>.</div>
+
+  <h2><span class="num">4</span>Why we love this one</h2>
+
+  <p>The first solution is honest work: it gets the right answer, and the $n^2$ pattern is a nice surprise. But it's tied to the symmetry of the setup, and it tells you <em>what</em> the answer is without really telling you <em>why</em>.</p>
+
+  <p>The second solution is the kind of idea that makes you grin. A single observation — <em>the ants are interchangeable, so let them pass through each other</em> — dissolves all the bouncing complexity into a grid of straight lines, turns "collisions" into "crossings", and hands you a more general answer than the one you were even asking for. That's the whole joy of a good puzzle: not the number at the end, but the moment the hard thing quietly becomes easy.</p>
+
+  <p>Thanks for reading. We hope you enjoyed it as much as we do. — Nerdsniped &amp; Nerdsniped</p>
+</article>
+
+<footer class="site">
+  <div class="wrap">© 2022 Nerdsniped · thanks for reading · a favourite puzzle, written up</div>
+</footer>
+
+<script>
+// KaTeX render (retry to dodge CDN/defer races)
+(function(){
+  var tries=0;
+  function render(){
+    if (window.renderMathInElement){
+      renderMathInElement(document.body,{
+        delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],
+        throwOnError:false
+      });
+    } else if (tries++ < 40){ setTimeout(render,100); }
+  }
+  if (document.readyState!=="loading") render();
+  else document.addEventListener("DOMContentLoaded", render);
+})();
+// theme toggle (shared with the rest of the site)
+(function(){
+  var KEY='nerdsniped-theme';
+  function cur(){ return localStorage.getItem(KEY)||'dark'; }
+  function set(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem(KEY,t);
+    var b=document.getElementById('themebtn'); if(b) b.textContent=(t==='dark'?'☀':'☾');
+  }
+  function init(){ set(cur()); var b=document.getElementById('themebtn'); if(b) b.addEventListener('click',function(){ set(cur()==='dark'?'light':'dark'); }); }
+  if(document.readyState!=="loading") init(); else document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+<script src="../js/toc.js"></script>
+</body>
+</html>
