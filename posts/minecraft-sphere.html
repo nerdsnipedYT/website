@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Remaking Minecraft on a sphere (and then making a cube) — Nerdsniped</title>
+<meta name="description" content="An indie devlog: I built a Minecraft clone from scratch in Unity, except the world is shaped like a planet — a real sphere made of voxels. The geometry, the spherical chunking system, the features, and the cursed finale: building a cube inside spherical Minecraft.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="icon" type="image/jpeg" href="../assets/yt_logo.jpg">
+<link rel="stylesheet" href="../css/style.css?v=3">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><img class="brandlogo" src="../assets/yt_logo.jpg" alt="nerdsniped logo">Nerd<span>sniped</span></a>
+    <nav class="sans"><a href="../index.html">Blog</a><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
+  </div>
+</header>
+
+<article>
+  <div class="post-head">
+    <div class="kicker">Devlog · game development</div>
+    <h1 class="title">Remaking Minecraft on a sphere (and then making a cube)</h1>
+    <div class="byline">
+      <span>Nerdsniped</span><span class="dot">•</span><span>March 2023</span><span class="dot">•</span><span>~8 min read</span><span class="dot">•</span><span>indie devlog</span>
+    </div>
+    <div class="tags"><a class="tag-chip" href="../index.html?tag=game-dev">game dev</a><a class="tag-chip" href="../index.html?tag=voxels">voxels</a><a class="tag-chip" href="../index.html?tag=computational-geometry">computational geometry</a></div>
+  </div>
+
+  <p>Everyone gives the same advice to first-time game developers: don't start with your dream game. Start small. Don't overthink it. So naturally, I ignored all of it, and spent six months building my dream game from scratch with no prior experience, because I figured I'd be the exception. Well — too late now. Welcome to devlog 1.</p>
+
+  <p>Here's the pitch. I really like Minecraft, and let's be honest, so do you. But you know the two worst things in Minecraft? <strong>Circles and spheres.</strong> They come out pointy and terrible, and if you've ever tried to build one by hand you know the pain. Plenty of people have tried to fix this from inside the game with command blocks and armor stands — but those circles are useless. You can't touch them, mine them, or stand on them. They just sit there.</p>
+
+  <p>So I solved it the other way around. For the last few months I've been building a <strong>Minecraft clone from scratch in Unity</strong>, with one twist: the world isn't flat, it's a <strong>sphere</strong> — a whole planet made of voxels. In my game, a perfect circle is just... a thing you can walk on. Take that, Mojang.</p>
+
+  <figure>
+    <img src="../assets/mc_cover.png" alt="A spherical voxel planet next to game code, with the caption 'WAIT… IT CURVES??'">
+    <figcaption><b>Yes, it curves.</b> A planet-shaped world built entirely out of (very slightly cheating) blocks.</figcaption>
+  </figure>
+
+  <p>If you'd rather watch the whole thing in motion — the planet, the mining, the moon, the cursed cube at the end — the video lives here:</p>
+
+  <!-- VIDEO: replace this placeholder with the embed once the link is ready, e.g.
+       <div style="position:relative;padding-top:56.25%">
+         <iframe style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:14px"
+                 src="https://www.youtube.com/embed/VIDEO_ID"
+                 title="Remaking Minecraft on a sphere" allowfullscreen></iframe>
+       </div>
+  -->
+  <figure>
+    <div style="position:relative;padding-top:56.25%;border:1px dashed var(--line);border-radius:14px;background:var(--surface);overflow:hidden">
+      <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--faint);font-family:Inter,sans-serif">
+        <div style="font-size:40px;line-height:1">▶</div>
+        <div style="font-size:15px;font-weight:600">Video coming soon</div>
+        <div style="font-size:12.5px">the full devlog will be embedded here</div>
+      </div>
+    </div>
+    <figcaption><b>The devlog.</b> The video walkthrough will be embedded here shortly.</figcaption>
+  </figure>
+
+  <h2><span class="num">1</span>How do you make a sphere out of cubes?</h2>
+
+  <p>Hold on — how can a sphere be made of cubes? Good question. The honest answer is that these voxels aren't really cubes. Each one carries a small amount of distortion, and that distortion is exactly what lets them tile a sphere perfectly. For my fellow nerds, here's how it actually works. (If you don't care about the geometry, skip to the next section.)</p>
+
+  <p>You start with a cube and divide each face into a grid of squares. Then you <strong>inflate</strong> the cube into a sphere: every point gets pushed out to a fixed distance from the centre. The simplest version is just normalising each point and scaling it to the planet radius $R$,</p>
+
+  $$\mathbf{p} \;\longmapsto\; R\,\frac{\mathbf{p}}{\lVert \mathbf{p}\rVert},$$
+
+  <p>which turns the six flat grids of the cube into six curved patches that stitch together into a full sphere (do it slightly more cleverly — the "spherified cube" — and the cells come out more even). Do this for every layer of the planet, connect the square tiles between consecutive layers, and you get solid voxels.</p>
+
+  <p>There's a catch. The further a block is from the centre, the wider it gets — a cell's real width grows with its radius, so blocks near the surface balloon while blocks near the core stay tiny, which looks terrible. My fix: whenever a block would get wider than about two metres, I <strong>split it into smaller blocks</strong>. Near the core, coarse blocks; near the surface, finer ones. Same apparent size everywhere.</p>
+
+  <figure class="tight">
+    <img src="../assets/mc_split.svg" alt="A radial slice of the planet: voxels fan out and get wider with radius, and a wider outer block is split into two narrower ones">
+    <figcaption><b>Keeping blocks the same size.</b> A radial slice through the planet. Cells fan out from the core and grow wider the higher you go — so once a block would get too wide, it's split in two (dashed).</figcaption>
+  </figure>
+
+  <h2><span class="num">2</span>The hard part: a chunking system on a sphere</h2>
+
+  <p>Your computer can only do so many calculations per second. Ask it to render an entire planet of blocks at once and it simply dies. So, like Minecraft, the world is divided into <strong>chunks</strong> that load and unload as you move — a chunking system, an absolutely necessary part of any voxel game.</p>
+
+  <p>On a sphere, chunking has its own special headaches. There are broadly three problems:</p>
+  <ol>
+    <li><strong>How you store the data</strong> for each chunk.</li>
+    <li><strong>How you find a block's neighbours</strong> — you only want to render block faces that touch air, since those are the only ones a player can ever see.</li>
+    <li><strong>How you find the block closest to a given point</strong> — essential for mining and building, where you fire a raycast from the player's hand and need to turn the hit coordinates back into "which block is this, and where is it stored?"</li>
+  </ol>
+
+  <p>In flat Minecraft these are easy. Store each chunk as a 3D array, keep the chunks in a dictionary indexed by coordinates; a block's neighbours are just $\pm 1$ on the local coordinates; and the nearest block to a point is just rounding to the nearest integer. Done.</p>
+
+  <p>On the sphere, everything gets trickier — because the world is really six deformed grids wrapped into a ball. I give every block <strong>four coordinates</strong>: $(\text{side}, x, y, z)$.</p>
+  <ul>
+    <li><strong>side</strong> — which of the original cube's six faces the block belongs to (an integer $0$–$5$).</li>
+    <li><strong>y</strong> — the height, i.e. which layer of the planet the block sits in.</li>
+    <li><strong>x, z</strong> — the block's position within that side.</li>
+  </ul>
+
+  <p>The subtle bit: to define $x$ and $z$ on a face you have to pick where $(0,0)$ is and which way each axis increases, separately for each of the six sides — and then religiously respect that choice for the rest of development. The trouble shows up at the <strong>seams</strong>: a block on the edge of one side has a neighbour that lives on a <em>different</em> side, so finding its coordinates is no longer "add one." The same awkwardness hits problem #3 — turning a world-space point into the nearest block's local coordinates is genuinely fiddly when you're straddling two faces of the cube.</p>
+
+  <div class="aside sans"><span class="lbl">Why this is the whole game</span>
+  Mining and building both rest entirely on problems #2 and #3. Get neighbour-detection wrong and you render invisible faces (slow) or leave holes (ugly). Get closest-block wrong and your pickaxe mines the wrong cube. On a flat grid these are one-liners; on a cubed sphere they're the part that actually took the time.</div>
+
+  <h2><span class="num">3</span>A quick tour of the features</h2>
+
+  <p>With the geometry working, I went feature-crazy. A speed-run of what's in there:</p>
+  <ul>
+    <li><strong>Visuals.</strong> Block textures (I shamelessly borrowed Minecraft's for a while), then a gorgeous realistic atmosphere shader adapted from one of Sebastian Lague's videos — which I ended up rolling back to the minimalist textures I'd drawn in three minutes on day one. Then <strong>ambient occlusion</strong>, the single coolest feature of any voxel engine. Look at it. Beautiful.</li>
+    <li><strong>Core gameplay.</strong> Mining, building, and a very simple UI.</li>
+    <li><strong>World.</strong> A basic biome manager, a procedural cave system, and — because why not — a moon.</li>
+    <li><strong>The unglamorous stuff.</strong> A save system (a game you can't save would, in fact, suck), and local multiplayer so you can explore with friends — very much a work in progress.</li>
+  </ul>
+
+  <h2><span class="num">4</span>OK but can I make a cube?</h2>
+
+  <p>After all that, a cursed thought arrived. In normal Minecraft you approximate a sphere out of blocks. So in <em>my</em> game, where the blocks are themselves slightly curved, I should be able to approximate a <strong>cube</strong> out of my deformed voxels. I was very curious how that would look (and, to be honest, I also wanted to feed the algorithm a catchy title). So: here it is, a cube inside spherical Minecraft. Cool cool cool cool cool.</p>
+
+  <h2><span class="num">5</span>Why on earth am I doing this?</h2>
+
+  <p>Very good question. I started this because it's kind of my dream game. The original — naive — vision was an Outer-Wilds-style space-exploration game where every planet is fully editable with a voxel engine: a handful of hand-crafted worlds, structures and NPCs, a universe full of things to discover with your friends.</p>
+
+  <p>After these months of work I've accepted that this is <strong>not</strong> a realistic scope for a solo hobbyist. But I genuinely loved building it, and I learned a frankly absurd amount of computational geometry along the way. If you want to know more about how any of it works, ask — I'll answer anything. And if you'd like to actually play it, I'll put out a demo once the video hits 200 likes, so, you know what to do.</p>
+
+  <p>Thanks for reading, and have a good day. — Nerdsniped</p>
+</article>
+
+<footer class="site">
+  <div class="wrap">© 2023 Nerdsniped · thanks for reading · devlog 1 of an over-ambitious dream game</div>
+</footer>
+
+<script>
+// KaTeX render (retry to dodge CDN/defer races)
+(function(){
+  var tries=0;
+  function render(){
+    if (window.renderMathInElement){
+      renderMathInElement(document.body,{
+        delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],
+        throwOnError:false
+      });
+    } else if (tries++ < 40){ setTimeout(render,100); }
+  }
+  if (document.readyState!=="loading") render();
+  else document.addEventListener("DOMContentLoaded", render);
+})();
+// theme toggle (shared with the rest of the site)
+(function(){
+  var KEY='nerdsniped-theme';
+  function cur(){ return localStorage.getItem(KEY)||'dark'; }
+  function set(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem(KEY,t);
+    var b=document.getElementById('themebtn'); if(b) b.textContent=(t==='dark'?'☀':'☾');
+  }
+  function init(){ set(cur()); var b=document.getElementById('themebtn'); if(b) b.addEventListener('click',function(){ set(cur()==='dark'?'light':'dark'); }); }
+  if(document.readyState!=="loading") init(); else document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+<script src="../js/toc.js"></script>
+</body>
+</html>
