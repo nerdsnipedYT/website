@@ -1,0 +1,266 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Can a network tell you which examples it has already memorized? — Nerdsniped</title>
+<meta name="description" content="A frozen random network gives a surprisingly clean 'I've seen this enough' signal. We use it to down-weight memorized examples and re-balance a lop-sided dataset, with no labels.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="icon" type="image/jpeg" href="../assets/yt_logo.jpg">
+<link rel="stylesheet" href="../css/style.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><img class="brandlogo" src="../assets/yt_logo.jpg" alt="nerdsniped logo">Nerd<span>sniped</span></a>
+    <nav class="sans"><a href="../index.html">Blog</a><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
+  </div>
+</header>
+
+<article>
+  <div class="post-head">
+    <div class="kicker">Experiment · generalization</div>
+    <h1 class="title">Can a network tell you which examples it has already memorized?</h1>
+    <div class="byline">
+      <span>Nerdsniped</span><span class="dot">•</span><span>June 2026</span><span class="dot">•</span><span>~20 min read</span><span class="dot">•</span><span>MNIST &amp; CIFAR-100</span>
+    </div>
+  </div>
+
+  <p>Here is a shower-thought that refused to leave me alone. A neural network overfits by continuing to push the loss down on examples it has <em>already</em> gotten right — grinding a training point from 99% confidence to 99.9% confidence, learning nothing that generalizes, just memorizing harder. If only the network could raise its hand and say <em>"I've seen this one enough, stop wasting gradient on it"</em>, we could spend that capacity elsewhere and maybe overfit less.</p>
+
+  <p>The obvious objection: to know an example is "already learned" you'd compute its loss, which needs its label, and now you're just doing hard-example mining with extra steps. But what if the signal didn't need labels at all? What if a network could measure its own <em>familiarity</em> with an input — how many times it has effectively seen something like it — directly, cheaply, as a side effect of training?</p>
+
+  <p>This post is the writeup of chasing that idea. It has a clean trick at its center (a frozen random network), a deliberately rigged experiment to test it, an honest scorecard, and — because staring at high-dimensional representations is the best part — a pair of interactive UMAP explorers you can poke at. Spoiler, so you can calibrate: <strong>the familiarity signal is real and surprisingly clean, but turning it into free generalization is harder than it looks.</strong> That gap is the interesting part.</p>
+
+  <h2><span class="num">1</span>The familiarity signal: a frozen random network</h2>
+
+  <p>The trick comes from a 2018 RL paper, <a href="https://arxiv.org/abs/1810.12894" target="_blank" rel="noopener">Random Network Distillation</a> (RND), where it was used to make agents curious about novel states. It is almost suspiciously simple.</p>
+
+  <p>Take two small networks, both reading the same input $x$:</p>
+  <ul>
+    <li>$R$, a <strong>target</strong> with random weights that we <strong>freeze forever</strong>. It computes some arbitrary, fixed, nonlinear function $R(x)$. We never train it; it is just a fixed random landscape.</li>
+    <li>$P$, a <strong>predictor</strong> that we <em>train</em> to imitate the target by minimizing $\lVert P(x) - R(x)\rVert^2$.</li>
+  </ul>
+
+  <p>Now watch the prediction error $\lVert P(x)-R(x)\rVert^2$ as training proceeds. On inputs $P$ has seen many times, it has had ample opportunity to match $R$ there, so the error is <strong>small</strong>. On inputs that are rare or novel, $P$ has had little practice, so the error stays <strong>large</strong>. The error is a <em>familiarity meter</em>: low where the data is dense and well-trodden, high where it is sparse or new. And it costs nothing but a forward pass — no labels, no notion of "correct."</p>
+
+  <div class="aside sans"><span class="lbl">Why a <em>random</em> target?</span>
+  The target just needs to be a fixed, deterministic, sufficiently expressive function that $P$ has to actually <em>learn</em> rather than guess. A random net is the cheapest such oracle: there's nothing to "understand," so the only way for $P$ to lower its error on a region is to have spent gradient steps there. The error becomes a clean proxy for "how much have I trained on inputs like this."</div>
+
+  <p>So here is the plan. Train a classifier $M$ as usual, but <strong>down-weight each example by how familiar it is</strong>. Familiar (memorized) examples get a small weight; novel ones keep a big one. Per minibatch, the loss is</p>
+
+  $$\mathcal{L} \;=\; \underbrace{\tfrac1N\sum_i \lVert P_i - R_i\rVert^2}_{\text{train the predictor } P} \;+\; \underbrace{\tfrac1N\sum_i \operatorname{sg}\!\big[\lVert P_i - R_i\rVert^2\big]\cdot \ell_i(M)}_{\text{familiarity-weighted classifier loss}}$$
+
+  <p>where $\ell_i(M)$ is the classifier's per-example cross-entropy and $\operatorname{sg}[\cdot]$ is stop-gradient (PyTorch's <code>.detach()</code>). Three rules make this behave:</p>
+  <ul>
+    <li><strong>$R$ is frozen.</strong> It is a fixed ruler; training it would move the goalposts.</li>
+    <li><strong>$P$ trains only through the first term.</strong> Its input is detached from $M$, so no classifier gradient leaks into the familiarity meter.</li>
+    <li><strong>The weight is detached.</strong> The factor multiplying $\ell_i$ is a number, not a thing to optimize — it re-weights examples without contributing gradients of its own. Crucially this is a <em>per-example</em> product, $\sum_i w_i\,\ell_i$, not (mean weight)·(mean loss).</li>
+  </ul>
+
+  <p>One implementation note that matters: the raw $\lVert P-R\rVert^2$ shrinks globally as $P$ learns, which would quietly turn down the classifier's whole learning rate. We don't care about the absolute scale, only the <em>relative</em> emphasis across examples, so each minibatch normalizes the weights to mean 1. That keeps the comparison against an unweighted baseline honest — same effective learning rate, only the within-batch tilt differs.</p>
+
+  <h2><span class="num">2</span>Where should the meter look? Not at pixels.</h2>
+
+  <p>The first version I built fed $R$ and $P$ the raw pixels. It worked, in the sense that the error did separate common from rare inputs — but the separation tracked <em>pixel-space density</em>, which is only loosely related to what the classifier has actually memorized. Two MNIST sevens can be far apart in pixel space yet identical to the model; a familiarity meter on pixels can't know that.</p>
+
+  <p>So I moved the towers' eyes inward. They now read the classifier's own <strong>mid-network latent</strong> — the token stream halfway through the Vision Transformer, mean-pooled — detached so no gradient flows back. Now "familiarity" is measured in the representation the model actually uses to decide, and it drifts as the model learns: as $M$ reshapes its latent space, $R$'s readout of that space moves too, and $P$ chases a slowly moving target. This one change is the difference between a meter on the world and a meter on the model's <em>experience</em> of the world.</p>
+
+  <figure class="tight">
+    <img src="../assets/diagram.svg" alt="Architecture diagram: a Vision Transformer with two side towers reading its middle layer">
+    <figcaption><b>The setup.</b> A small ViT classifies the image. Halfway up, a detached copy of the (mean-pooled) token stream is fed to two MLP towers: a frozen random target <b>R</b> and a predictor <b>P</b> trained to imitate it. Their squared difference is the per-example familiarity weight that re-scales the classifier's loss. Dashed arrows are stop-gradient.</figcaption>
+  </figure>
+
+  <h2><span class="num">3</span>A rigged-on-purpose experiment</h2>
+
+  <p>To test "down-weight what you've memorized," I want a setting where memorization and generalization visibly diverge, and where I know the right answer in advance so I can check the trick against an oracle. Class imbalance is perfect for this.</p>
+
+  <p>I built a deliberately lopsided MNIST: a training pool of <strong>10,000 images that is 91% the digit 8</strong> (9,100 of them) and just <strong>100 examples each</strong> of the other nine digits. The model will see eights constantly and memorize them to death, while starving on the rare digits. Then I evaluate on a <strong>perfectly balanced</strong> test set (200 of every digit) and report <strong>macro accuracy</strong> — the unweighted mean over classes — because a model that simply always shouts "8" already scores 91% by the naive metric and 10% by the honest one.</p>
+
+  <p>The classifier is a small from-scratch ViT (7×7 patches → 16 tokens, 4 Transformer blocks, ~139K parameters); each tower is a ~115K-parameter MLP reading the latent after block 2. No dropout, no weight decay — I <em>want</em> it to overfit so there is something to fix. Then I run three training regimes that differ only in how examples are weighted:</p>
+
+  <div class="tbl-wrap"><table class="res sans">
+    <thead><tr><th>regime</th><th>per-example weight</th><th>uses labels?</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag" style="background:#5b6c8f"></span>baseline</td><td>1 (uniform)</td><td>—</td></tr>
+      <tr><td><span class="tag" style="background:#2e9e8f"></span>normal_weight</td><td>1/91 for eights, 1 otherwise</td><td>yes (oracle)</td></tr>
+      <tr><td><span class="tag" style="background:#e0663a"></span>novelty-RND</td><td>detached $\lVert P-R\rVert^2$</td><td>no</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>The middle one, <strong>normal_weight</strong>, is the oracle: classic inverse-frequency balancing that uses the labels to make every class contribute equal total weight (each of the 9,100 eights is worth $1/91$ of a rare example, so the eights collectively weigh the same as one rare digit). It is what good label-based re-balancing buys you — the target our label-free trick is trying to sneak up on. The baseline is the do-nothing control. <strong>novelty-RND</strong> is the contender.</p>
+
+  <h2><span class="num">4</span>Does the meter even fire?</h2>
+
+  <p>Before asking whether the trick helps, the precondition: does the familiarity signal actually assign <em>lower</em> novelty to the over-memorized eights than to the starved rare digits? If $P$ predicts $R$ equally well everywhere, there's nothing to re-weight and the rest is moot.</p>
+
+  <p>It fires, and cleanly. Tracking the mean novelty separately for the majority and the rare classes, the two curves pull apart almost immediately and stay apart: by late training the rare digits carry <strong>2.5×</strong> the novelty of the eights. The meter has, with no labels, discovered which class the model is drowning in.</p>
+
+  <figure>
+    <iframe src="../assets/mnist_novelty.html" height="460" loading="lazy" title="Novelty over training, majority vs rare"></iframe>
+    <figcaption><b>The familiarity meter separates the classes.</b> Mean $\lVert P-R\rVert^2$ per step (log scale), split by majority digit 8 vs the nine rare digits. The predictor matches the random target far better on the abundant eights, so they read as "familiar" (low novelty); the rare digits stay novel. No labels were used to produce this split.</figcaption>
+  </figure>
+
+  <h2><span class="num">5</span>The honest scorecard</h2>
+
+  <p>So the signal is there. Does down-weighting by it actually help us generalize? Here the story gets more nuanced — which is to say, more honest.</p>
+
+  <p>First, the training curves. All three regimes drive <em>train</em> accuracy to ~100% (this is a memorization machine by construction). On the balanced test set, the baseline climbs, peaks, and then <strong>degrades</strong> as it overfits the eights — the classic overfitting signature. The oracle <em>normal_weight</em> sits clearly above everyone. novelty-RND tracks just above the baseline and, notably, <strong>degrades less</strong> after the peak.</p>
+
+  <figure>
+    <iframe src="../assets/mnist_curves.html" height="460" loading="lazy" title="Macro test accuracy over training"></iframe>
+    <figcaption><b>Macro test accuracy over training.</b> Labeled re-balancing (green) wins. The label-free novelty weighting (orange) rides just above the baseline (blue) and resists the post-peak slide, but does not approach the oracle.</figcaption>
+  </figure>
+
+  <p>Now the per-class breakdown, which is where the trick shows its hand. Compared to the baseline, novelty-RND <strong>lifts the rare digits and gently lowers the majority</strong> — it is re-balancing in exactly the right direction, landing <em>partway</em> between the baseline and the labeled oracle. It is doing the right thing; it is just doing a fraction of it.</p>
+
+  <figure>
+    <iframe src="../assets/mnist_perclass.html" height="460" loading="lazy" title="Per-class balanced test accuracy"></iframe>
+    <figcaption><b>Per-class balanced-test accuracy.</b> Digit 8 (the 91% majority) is the leftmost group's far value; the rest are the starved 1% classes. novelty-RND (orange) sits between baseline and oracle on most rare digits while giving up a sliver of majority accuracy — re-balancing without ever seeing a class label.</figcaption>
+  </figure>
+
+  <p>Put the numbers in one place. I report <em>final</em> macro accuracy (after the overfitting has happened — the fairest "did it overfit less" measure), the mean rare-class accuracy, and the majority accuracy:</p>
+
+  <div class="tbl-wrap"><table class="res sans">
+    <thead><tr><th>regime</th><th>final macro</th><th>rare-class acc</th><th>majority (8) acc</th><th>best macro, 3 seeds</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag" style="background:#5b6c8f"></span>baseline</td><td>0.667</td><td>0.631</td><td>0.99</td><td>0.691</td></tr>
+      <tr><td><span class="tag" style="background:#2e9e8f"></span>normal_weight <span style="color:#8a8a96">(oracle)</span></td><td class="hi">0.707</td><td class="hi">0.678</td><td>0.965</td><td class="hi">0.731</td></tr>
+      <tr><td><span class="tag" style="background:#e0663a"></span>novelty-RND</td><td>0.689</td><td>0.657</td><td>0.98</td><td>0.689</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>Read this carefully, because it's a mixed verdict and both halves matter:</p>
+  <ul>
+    <li><strong>The good:</strong> at the end of training, novelty-RND beats the baseline's macro accuracy (0.689 vs 0.667) and rare-class accuracy (0.657 vs 0.631), purely from a label-free familiarity signal. It really does overfit the majority a bit less and spend more on the rare classes.</li>
+    <li><strong>The sobering:</strong> it recovers maybe <em>half</em> the gap to the labeled oracle, and when you take each method's <em>best</em> point across three seeds, novelty-RND is statistically indistinguishable from the baseline (0.689 vs 0.691) while the oracle is clearly ahead (0.731). The signal is real; the free lunch is small and seed-dependent.</li>
+  </ul>
+
+  <div class="aside sans"><span class="lbl">The uncomfortable subtlety</span>
+  Inverse-frequency weighting needs to <em>perfectly</em> cancel the 91:1 ratio to balance the classes. Our novelty ratio is about 2.5:1. So the meter knows the eights are over-represented, but it under-states <em>by how much</em> — familiarity saturates long before frequency does. A meter that says "you've seen this plenty" can't easily distinguish "plenty" from "ninety-one times too much." That ceiling, more than anything, is why the trick re-balances in the right direction but only partway.</div>
+
+  <h2><span class="num">6</span>The fun part: a UMAP explorer</h2>
+
+  <p>Numbers are a summary; representations are the thing. So here is the part I actually built this for — an interactive map of how these 1,500 balanced-test images lay out in the model's representation, layer by layer. Two dropdowns:</p>
+  <ul>
+    <li><strong>layer</strong> sweeps from the patch embedding up through the four Transformer blocks, then into the side towers' own activations (<code>P:hidden1</code> → <code>P:out</code>, and the frozen <code>R</code>). You're watching the representation sharpen — and you can literally see where the towers' world looks nothing like the classifier's.</li>
+    <li><strong>color by</strong> recolors the same points by class label or by a low-level image statistic (brightness, ink, stroke energy…). It's a quick test of whether a cluster is "about the digit" or secretly "about the brightness."</li>
+  </ul>
+  <p>And <strong>hover any point to see the actual image</strong>. Go find the majority blob (digit 8, outlined in black); watch it tighten into a dense island in the deeper blocks while the starved classes stay diffuse.</p>
+
+  <figure class="wide">
+    <iframe src="../assets/mnist_umap.html" height="620" loading="lazy" title="MNIST UMAP explorer"></iframe>
+    <figcaption><b>MNIST representation explorer.</b> UMAP (cosine, standardized, PCA-50) of each layer's embedding. The black-outlined points are the 91% majority (digit 8). Notice how, in the classifier blocks, the eights condense into a tight cluster — that tightness <em>is</em> the low-novelty region the meter down-weights — while the <code>R</code> tower (a frozen random map) shows no class structure at all, exactly as it should.</figcaption>
+  </figure>
+
+  <h2><span class="num">7</span>Does it survive a real dataset? CIFAR-100</h2>
+
+  <p>MNIST is a toy; structure there is almost free. The honest test is a dataset where the model has to fight for its representation. So I ran the identical pipeline on <strong>CIFAR-100</strong>, with one fine class — <em>sunflower</em> — blown up to <strong>90% of a 20,000-image pool</strong> and the other 99 classes sharing the scraps (~20 examples each). Bigger ViT (~0.83M parameters, 6 blocks), same three regimes, same balanced-test macro accuracy over 100 classes (where "always predict the majority" scores just 1%).</p>
+
+  <p>This regime is brutal — 99 classes with a couple dozen examples each — so absolute numbers are low across the board; what matters is the <em>relative</em> picture.</p>
+
+  <div class="tbl-wrap"><table class="res sans">
+    <thead><tr><th>regime</th><th>best macro</th><th>rare-class acc</th><th>majority acc</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag" style="background:#5b6c8f"></span>baseline</td><td>8.9%</td><td>7.9%</td><td>90%</td></tr>
+      <tr><td><span class="tag" style="background:#2e9e8f"></span>normal_weight <span style="color:#8a8a96">(oracle)</span></td><td>8.6%</td><td>7.7%</td><td>52%</td></tr>
+      <tr><td><span class="tag" style="background:#e0663a"></span>novelty-RND</td><td>8.8%</td><td>8.0%</td><td>86%</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>This is the most instructive failure in the whole project. With ~20 images per rare class, the 99 minority classes are <strong>essentially unlearnable</strong>, so every method is pinned near the ~9% macro floor. The novelty meter fires <em>harder</em> than on MNIST — a <strong>5.6×</strong> majority/rare split — yet it buys nothing, because there is no generalization to recover. Watch what re-balancing does in this regime: the labeled oracle dutifully drives loss toward the rare classes, but with nothing learnable there it mostly just <strong>throws away majority accuracy</strong> (sunflower crashes from 90% to 52%) for no macro gain. novelty-RND, gentle by construction, keeps far more of the majority (86%) and edges everyone on rare-class accuracy — but in truth it is a wash at the floor. The lesson is sharp: a strong familiarity signal is <em>necessary but not sufficient</em>; re-weighting can move accuracy around, it cannot conjure generalization the data does not contain.</p>
+
+  <figure>
+    <iframe src="../assets/cifar_curves.html" height="460" loading="lazy" title="CIFAR-100 macro test accuracy"></iframe>
+    <figcaption><b>CIFAR-100 macro test accuracy.</b> All three are pinned near the ~9% floor: with ~20 examples per rare class there is nothing to learn. The labeled oracle (green) does not lead here — it drives loss toward the rare classes but mostly sacrifices majority accuracy. novelty-RND (orange) stays gentle and tracks the baseline.</figcaption>
+  </figure>
+
+  <figure>
+    <iframe src="../assets/cifar_perclass.html" height="500" loading="lazy" title="CIFAR-100 per-class accuracy"></iframe>
+    <figcaption><b>Per-class accuracy, method vs baseline.</b> Each point is one of the 100 classes; above the diagonal means the method beats the baseline on that class. The star is the majority class. The star is the majority class — note how far it falls for the oracle (green), traded away for rare classes that 20 examples cannot teach. Most rare classes barely move for either method; the headroom simply is not there.</figcaption>
+  </figure>
+
+  <p>And the same explorer, now in glorious color — try coloring by <strong>avg color</strong> or <strong>saturation</strong> and you'll often find the early layers organize by palette before they organize by category. Hover to confirm with the actual photo.</p>
+
+  <figure class="wide">
+    <iframe src="../assets/cifar_umap.html" height="620" loading="lazy" title="CIFAR-100 UMAP explorer"></iframe>
+    <figcaption><b>CIFAR-100 representation explorer.</b> The dominant class is outlined; switch the <em>color by</em> dropdown to see how much of the early-layer geometry is explained by low-level image statistics versus class. The frozen <code>R</code> tower again shows no class structure — its job is to be a fixed ruler, not a classifier.</figcaption>
+  </figure>
+
+  <h2><span class="num">8</span>What I think is going on</h2>
+
+  <p>Here's my read after staring at all of this. The familiarity meter works — genuinely, label-free, and it lives in the right space once you point it at the model's latents instead of the pixels. You can see it fire, you can watch the majority condense into the low-novelty island, you can measure the 2.5× split. As a <em>diagnostic</em> for "what has this model over-memorized," I'd reach for it again.</p>
+
+  <p>But as a <em>lever</em> for generalization, it's a blunt instrument, for two reasons that I think are fundamental rather than fixable with more tuning:</p>
+  <ul>
+    <li><strong>Familiarity saturates; frequency doesn't.</strong> The predictor's error bottoms out once an example is "learned enough," so the meter compresses a 91× frequency gap into a ~2.5× novelty gap. It can tell you the eights are over-represented but badly under-counts by how much — and re-balancing needs the magnitude, not just the sign.</li>
+    <li><strong>Down-weighting the majority is not the same as helping the minority.</strong> The oracle works because it actively re-allocates total loss mass to the rare classes. Detached novelty only ever <em>shrinks</em> weights; with the mean-1 normalization it tilts within a batch, but it can't manufacture the aggressive minority emphasis that inverse-frequency weighting gets for free from labels.</li>
+  </ul>
+
+  <p>None of this kills the idea. It sharpens it. The version I'd build next stops treating novelty as a <em>weight</em> and starts treating it as a <em>signal to act on</em>: a curriculum that resamples toward high-novelty examples (which can over-emphasize the minority, breaking the saturation ceiling), or a calibration step that maps the saturating novelty back onto something closer to a frequency. The meter is good; the actuator is what's weak.</p>
+
+  <div class="aside sans"><span class="lbl">The honest one-liner</span>
+  A frozen random network gives you a clean, label-free read on what your model has memorized. Using that read to <em>down-weight</em> memorized examples nudges generalization in the right direction but recovers only part of what label-based balancing gets — because "I've seen this enough" saturates long before "I've seen this 91× too often."</div>
+
+  <h2><span class="num">9</span>Takeaways</h2>
+  <ul>
+    <li>A frozen-random target + a chasing predictor turns "how much have I trained on inputs like this" into a cheap, label-free number. Point it at the model's <strong>mid-layer latents</strong>, not the pixels.</li>
+    <li>In a 91%-majority MNIST it discovers the over-memorized class on its own (2.5× novelty split) and re-balances training in the right direction — final macro 0.667 → 0.689 — but lands only partway to a labeled oracle (0.707), and the gain washes out into seed noise at the per-method best.</li>
+    <li>The same qualitative story holds on CIFAR-100. At ~20 examples per rare class the minority is essentially unlearnable, so re-balancing can't manufacture macro accuracy — the labeled oracle even hurts by over-correcting the majority (90%→52%), while the gentle novelty weighting does least harm, and the meter fires hardest of all (5.6×).</li>
+    <li>The bottleneck is that familiarity <em>saturates</em>: it nails the sign of the imbalance but understates its magnitude. The next iteration should resample on the signal rather than merely scale by it.</li>
+  </ul>
+
+  <hr>
+  <p class="sans" style="font-size:15px;color:#8a8a96">
+  <strong>Reproducibility.</strong> Everything is from-scratch PyTorch — a small ViT classifier, two MLP towers on its mid-layer latent, Adam, no augmentation or regularization. MNIST and CIFAR-100 are downloaded directly (no torchvision). The novelty weight is detached and mean-1 normalized per batch; $R$ is frozen; $P$ trains only on $\lVert P-R\rVert^2$. The UMAP explorers project each layer's embedding with cosine UMAP after standardization and PCA-50, and embed the original images as base64 for hover. Two companion notebooks reproduce every figure on this page.
+  </p>
+</article>
+
+<footer class="site">
+  <div class="wrap">© 2026 Nerdsniped · thanks for reading · the plots are live — drag, zoom, hover</div>
+</footer>
+
+<script>
+// --- KaTeX: render once the auto-render script has loaded (retry to dodge CDN/defer races) ---
+(function(){
+  var tries=0;
+  function render(){
+    if (window.renderMathInElement){
+      renderMathInElement(document.body,{
+        delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],
+        throwOnError:false
+      });
+    } else if (tries++ < 40){ setTimeout(render,100); }
+  }
+  if (document.readyState!=="loading") render();
+  else document.addEventListener("DOMContentLoaded", render);
+})();
+
+// --- theme toggle + broadcast to figure iframes ---
+(function(){
+  var KEY='nerdsniped-theme';
+  function cur(){ return localStorage.getItem(KEY)||'dark'; }
+  function postAll(t){ document.querySelectorAll('iframe').forEach(function(f){ try{ f.contentWindow.postMessage({theme:t},'*'); }catch(e){} }); }
+  function set(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem(KEY,t);
+    var b=document.getElementById('themebtn'); if(b) b.textContent = (t==='dark'?'☀':'☾');
+    postAll(t);
+  }
+  function init(){
+    set(cur());
+    var b=document.getElementById('themebtn'); if(b) b.addEventListener('click',function(){ set(cur()==='dark'?'light':'dark'); });
+    document.querySelectorAll('iframe').forEach(function(f){ f.addEventListener('load',function(){ try{ f.contentWindow.postMessage({theme:cur()},'*'); }catch(e){} }); });
+  }
+  if (document.readyState!=="loading") init();
+  else document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

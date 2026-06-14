@@ -1,0 +1,69 @@
+{
+  "params_vit": 138890,
+  "params_tower": 115328,
+  "n_maj": 9100,
+  "n_each": 100,
+  "tap_block": 2,
+  "depth": 4,
+  "best": {
+    "baseline": 0.704,
+    "normal_weight": 0.71,
+    "rnd": 0.6995
+  },
+  "final": {
+    "baseline": 0.667,
+    "normal_weight": 0.707,
+    "rnd": 0.689
+  },
+  "train_final": {
+    "baseline": 1.0,
+    "normal_weight": 0.9905,
+    "rnd": 1.0
+  },
+  "majority_acc": {
+    "baseline": 0.99,
+    "normal_weight": 0.965,
+    "rnd": 0.98
+  },
+  "rare_acc": {
+    "baseline": 0.6311111111111111,
+    "normal_weight": 0.6783333333333333,
+    "rnd": 0.6566666666666667
+  },
+  "nov_ratio": 2.5417080518978326,
+  "seeds": {
+    "baseline": [
+      0.69,
+      0.6765,
+      0.7075
+    ],
+    "normal_weight": [
+      0.7095,
+      0.7375,
+      0.7445
+    ],
+    "rnd": [
+      0.6895,
+      0.6805,
+      0.6955
+    ]
+  },
+  "seeds_mean": {
+    "baseline": 0.6913333333333332,
+    "normal_weight": 0.7305,
+    "rnd": 0.6885
+  },
+  "umap_layers": [
+    "patch-embed",
+    "block1",
+    "block2",
+    "block3",
+    "block4",
+    "P:hidden1",
+    "P:hidden2",
+    "P:out",
+    "R:hidden1",
+    "R:hidden2",
+    "R:out"
+  ]
+}

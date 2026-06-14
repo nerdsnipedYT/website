@@ -1,0 +1,99 @@
+<svg viewBox="0 0 940 430" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <marker id="arr" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#6b6b78"/>
+    </marker>
+    <marker id="arrd" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#b06a4a"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#d9d9e3;stroke-width:1.5;rx:10}
+      .lbl{font-size:13px;fill:#33333c;font-weight:600}
+      .sub{font-size:11px;fill:#8a8a96}
+      .flow{stroke:#6b6b78;stroke-width:2;fill:none}
+      .sg{stroke:#c98a5b;stroke-width:2;fill:none;stroke-dasharray:5 4}
+      .blk{fill:#eef1f7;stroke:#c7cfe0;stroke-width:1.5}
+      .tag{font-size:10.5px;fill:#b06a4a;font-weight:700}
+    </style>
+  </defs>
+
+  <!-- main tower -->
+  <text x="40" y="30" class="lbl" font-size="14">Main tower — Vision Transformer</text>
+
+  <rect x="40" y="52" width="80" height="80" rx="10" class="box"/>
+  <text x="80" y="96" class="lbl" text-anchor="middle">image</text>
+  <text x="80" y="113" class="sub" text-anchor="middle">28×28</text>
+
+  <rect x="150" y="52" width="74" height="80" rx="10" class="box"/>
+  <text x="187" y="90" class="lbl" text-anchor="middle">patch</text>
+  <text x="187" y="107" class="lbl" text-anchor="middle">embed</text>
+
+  <rect x="254" y="52" width="56" height="80" rx="9" class="blk"/>
+  <text x="282" y="97" class="lbl" text-anchor="middle">blk 1</text>
+  <rect x="320" y="52" width="56" height="80" rx="9" class="blk"/>
+  <text x="348" y="97" class="lbl" text-anchor="middle">blk 2</text>
+  <rect x="386" y="52" width="56" height="80" rx="9" class="blk"/>
+  <text x="414" y="97" class="lbl" text-anchor="middle">blk 3</text>
+  <rect x="452" y="52" width="56" height="80" rx="9" class="blk"/>
+  <text x="480" y="97" class="lbl" text-anchor="middle">blk 4</text>
+
+  <rect x="538" y="52" width="74" height="80" rx="10" class="box"/>
+  <text x="575" y="90" class="lbl" text-anchor="middle">CLS</text>
+  <text x="575" y="107" class="lbl" text-anchor="middle">head</text>
+
+  <rect x="642" y="52" width="86" height="80" rx="10" class="box"/>
+  <text x="685" y="90" class="lbl" text-anchor="middle">class</text>
+  <text x="685" y="107" class="lbl" text-anchor="middle">logits</text>
+  <text x="685" y="124" class="sub" text-anchor="middle">→ ℓ(M)</text>
+
+  <!-- main flow arrows -->
+  <line x1="120" y1="92" x2="148" y2="92" class="flow" marker-end="url(#arr)"/>
+  <line x1="224" y1="92" x2="252" y2="92" class="flow" marker-end="url(#arr)"/>
+  <line x1="508" y1="92" x2="536" y2="92" class="flow" marker-end="url(#arr)"/>
+  <line x1="612" y1="92" x2="640" y2="92" class="flow" marker-end="url(#arr)"/>
+
+  <!-- tap from middle (after block 2) -->
+  <text x="348" y="160" class="tag" text-anchor="middle">mid-layer latent · detached</text>
+  <path d="M348,132 L348,196" class="sg" marker-end="url(#arrd)"/>
+
+  <!-- side towers -->
+  <text x="40" y="232" class="lbl" font-size="14">Side towers (read the mid-layer latent)</text>
+
+  <rect x="250" y="206" width="98" height="62" rx="10" class="box" stroke="#c98a5b"/>
+  <text x="299" y="233" class="lbl" text-anchor="middle">R · frozen</text>
+  <text x="299" y="251" class="sub" text-anchor="middle">random target</text>
+
+  <rect x="250" y="288" width="98" height="62" rx="10" class="box" stroke="#2e9e8f"/>
+  <text x="299" y="315" class="lbl" text-anchor="middle">P · trained</text>
+  <text x="299" y="333" class="sub" text-anchor="middle">imitates R</text>
+
+  <!-- latent splits to R and P -->
+  <path d="M348,196 L360,196 L360,237 L348,237" class="sg" fill="none" marker-end="url(#arrd)"/>
+  <path d="M360,196 L360,319 L348,319" class="sg" fill="none" marker-end="url(#arrd)"/>
+
+  <!-- novelty -->
+  <rect x="404" y="246" width="118" height="64" rx="12" fill="#fdf1ea" stroke="#e0a07e" stroke-width="1.5"/>
+  <text x="463" y="274" class="lbl" text-anchor="middle">‖P − R‖²</text>
+  <text x="463" y="293" class="sub" text-anchor="middle">novelty weight</text>
+
+  <line x1="348" y1="237" x2="402" y2="262" class="flow" marker-end="url(#arr)"/>
+  <line x1="348" y1="319" x2="402" y2="294" class="flow" marker-end="url(#arr)"/>
+
+  <!-- novelty trains P (back) and weights loss -->
+  <path d="M448,310 C448,340 360,340 320,340" class="flow" marker-end="url(#arr)"/>
+  <text x="392" y="362" class="sub" text-anchor="middle">trains P</text>
+
+  <!-- weight multiplies the classifier loss -->
+  <rect x="590" y="246" width="138" height="64" rx="12" fill="#f4f7f6" stroke="#bcd5cf" stroke-width="1.5"/>
+  <text x="659" y="270" class="lbl" text-anchor="middle">loss = w · ℓ(M)</text>
+  <text x="659" y="289" class="sub" text-anchor="middle">w = sg[‖P−R‖²]</text>
+
+  <path d="M522,278 L588,278" class="sg" marker-end="url(#arrd)"/>
+  <path d="M685,132 C720,180 720,210 700,244" class="flow" marker-end="url(#arr)"/>
+
+  <!-- legend -->
+  <line x1="40" y1="398" x2="74" y2="398" class="flow"/>
+  <text x="82" y="402" class="sub">gradient flow</text>
+  <line x1="190" y1="398" x2="224" y2="398" class="sg"/>
+  <text x="232" y="402" class="sub">stop-gradient (detach)</text>
+</svg>

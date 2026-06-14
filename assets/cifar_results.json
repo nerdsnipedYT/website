@@ -1,0 +1,45 @@
+{
+  "majority": "sunflower",
+  "params_vit": 834788,
+  "params_tower": 131712,
+  "n_maj": 18000,
+  "n_each": 20,
+  "tap_block": 3,
+  "depth": 6,
+  "best": {
+    "baseline": 0.089,
+    "normal_weight": 0.0862,
+    "rnd": 0.0884
+  },
+  "train_final": {
+    "baseline": 0.992092092092092,
+    "normal_weight": 0.6122122122122122,
+    "rnd": 0.9778278278278278
+  },
+  "majority_acc": {
+    "baseline": 0.9,
+    "normal_weight": 0.52,
+    "rnd": 0.86
+  },
+  "rare_acc": {
+    "baseline": 0.07878787878787878,
+    "normal_weight": 0.07656565656565657,
+    "rnd": 0.0797979797979798
+  },
+  "nov_ratio": 5.6119290692869495,
+  "umap_layers": [
+    "patch-embed",
+    "block1",
+    "block2",
+    "block3",
+    "block4",
+    "block5",
+    "block6",
+    "P:hidden1",
+    "P:hidden2",
+    "P:out",
+    "R:hidden1",
+    "R:hidden2",
+    "R:out"
+  ]
+}
