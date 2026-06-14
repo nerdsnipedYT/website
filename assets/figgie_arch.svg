@@ -1,0 +1,113 @@
+<svg viewBox="0 0 940 470" xmlns="http://www.w3.org/2000/svg" font-family="Inter, system-ui, sans-serif">
+  <defs>
+    <marker id="far" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#6b6b78"/>
+    </marker>
+    <marker id="fard" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#b06a4a"/>
+    </marker>
+    <style>
+      .box{fill:#fff;stroke:#d9d9e3;stroke-width:1.5}
+      .lbl{font-size:13px;fill:#33333c;font-weight:600}
+      .sub{font-size:11px;fill:#8a8a96}
+      .flow{stroke:#6b6b78;stroke-width:2;fill:none}
+      .loop{stroke:#b06a4a;stroke-width:2;fill:none;stroke-dasharray:5 4}
+      .blk{fill:#eef1f7;stroke:#c7cfe0;stroke-width:1.5}
+      .tok{fill:#f4f7f6;stroke:#bcd5cf;stroke-width:1.4}
+      .tag{font-size:10.5px;fill:#b06a4a;font-weight:700}
+    </style>
+  </defs>
+
+  <!-- ── policy network ─────────────────────────────────────────── -->
+  <text x="40" y="30" class="lbl" font-size="14">Policy / value transformer — one token per action taken</text>
+
+  <!-- token sequence -->
+  <rect x="40"  y="50" width="96" height="58" rx="10" class="box"/>
+  <text x="88" y="74" class="lbl" text-anchor="middle">init hand</text>
+  <text x="88" y="91" class="sub" text-anchor="middle">your 10 cards</text>
+
+  <rect x="146" y="50" width="54" height="58" rx="9" class="tok"/>
+  <text x="173" y="84" class="lbl" text-anchor="middle">a₁</text>
+  <rect x="206" y="50" width="54" height="58" rx="9" class="tok"/>
+  <text x="233" y="84" class="lbl" text-anchor="middle">a₂</text>
+  <text x="285" y="84" class="lbl" text-anchor="middle">···</text>
+  <rect x="310" y="50" width="54" height="58" rx="9" class="tok"/>
+  <text x="337" y="84" class="lbl" text-anchor="middle">aₜ</text>
+  <text x="202" y="128" class="sub" text-anchor="middle">public order-book events (bids · asks · trades)</text>
+
+  <!-- transformer stack -->
+  <rect x="412" y="44" width="150" height="100" rx="12" fill="#fbfaf7" stroke="#d9d9e3" stroke-width="1.5"/>
+  <text x="487" y="40" class="lbl" text-anchor="middle">causal transformer</text>
+  <rect x="430" y="60" width="114" height="22" rx="6" class="blk"/>
+  <text x="487" y="75" class="sub" text-anchor="middle">self-attention</text>
+  <rect x="430" y="86" width="114" height="22" rx="6" class="blk"/>
+  <text x="487" y="101" class="sub" text-anchor="middle">SwiGLU MLP</text>
+  <text x="487" y="130" class="sub" text-anchor="middle">×2–6 blocks · KV-cache rollouts</text>
+
+  <!-- heads -->
+  <rect x="612" y="44" width="128" height="46" rx="10" class="box" stroke="#e0a07e"/>
+  <text x="676" y="64" class="lbl" text-anchor="middle">policy head</text>
+  <text x="676" y="80" class="sub" text-anchor="middle">146 actions · masked</text>
+
+  <rect x="612" y="98" width="128" height="46" rx="10" class="box" stroke="#2e9e8f"/>
+  <text x="676" y="118" class="lbl" text-anchor="middle">value head</text>
+  <text x="676" y="134" class="sub" text-anchor="middle">expected chips</text>
+
+  <line x1="364" y1="79" x2="410" y2="92" class="flow" marker-end="url(#far)"/>
+  <line x1="562" y1="78" x2="610" y2="67" class="flow" marker-end="url(#far)"/>
+  <line x1="562" y1="108" x2="610" y2="120" class="flow" marker-end="url(#far)"/>
+
+  <!-- action menu -->
+  <text x="812" y="48" class="tag" text-anchor="middle">action space</text>
+  <rect x="754" y="56" width="150" height="88" rx="10" fill="#fdf1ea" stroke="#e0a07e" stroke-width="1.4"/>
+  <text x="766" y="74" class="sub">PASS</text>
+  <text x="766" y="90" class="sub">BUY / SELL · 4 suits</text>
+  <text x="766" y="106" class="sub">QUOTE bid / ask × 16 px</text>
+  <text x="766" y="122" class="sub">CANCEL · MASS-CANCEL</text>
+  <line x1="740" y1="67" x2="752" y2="80" class="flow" marker-end="url(#far)"/>
+
+  <!-- ── self-play loop ─────────────────────────────────────────── -->
+  <text x="40" y="222" class="lbl" font-size="14">Self-play training loop</text>
+
+  <!-- table with 4 seats -->
+  <circle cx="150" cy="330" r="58" fill="#fbfaf7" stroke="#d9d9e3" stroke-width="1.5"/>
+  <text x="150" y="326" class="lbl" text-anchor="middle">Figgie</text>
+  <text x="150" y="343" class="sub" text-anchor="middle">4 seats · 40 cards</text>
+  <circle cx="150" cy="266" r="13" fill="#e0663a"/><text x="150" y="270" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">π</text>
+  <circle cx="214" cy="330" r="13" fill="#5b6c8f"/><text x="214" y="334" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">θ₁</text>
+  <circle cx="150" cy="394" r="13" fill="#5b6c8f"/><text x="150" y="398" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">θ₂</text>
+  <circle cx="86"  cy="330" r="13" fill="#5b6c8f"/><text x="86" y="334" font-size="10" fill="#fff" text-anchor="middle" font-weight="700">θ₃</text>
+
+  <!-- rollouts -->
+  <rect x="300" y="298" width="150" height="64" rx="12" class="box"/>
+  <text x="375" y="324" class="lbl" text-anchor="middle">batched GPU</text>
+  <text x="375" y="341" class="lbl" text-anchor="middle">rollouts</text>
+  <text x="375" y="357" class="sub" text-anchor="middle">thousands of games</text>
+  <line x1="210" y1="330" x2="298" y2="330" class="flow" marker-end="url(#far)"/>
+
+  <!-- reward -->
+  <rect x="490" y="298" width="150" height="64" rx="12" fill="#fdf1ea" stroke="#e0a07e" stroke-width="1.4"/>
+  <text x="565" y="324" class="lbl" text-anchor="middle">reward =</text>
+  <text x="565" y="341" class="lbl" text-anchor="middle">end-of-game chips</text>
+  <text x="565" y="357" class="sub" text-anchor="middle">zero-sum across seats</text>
+  <line x1="450" y1="330" x2="488" y2="330" class="flow" marker-end="url(#far)"/>
+
+  <!-- update -->
+  <rect x="680" y="298" width="150" height="64" rx="12" class="box" stroke="#2e9e8f"/>
+  <text x="755" y="324" class="lbl" text-anchor="middle">PPO / Deep-CFR</text>
+  <text x="755" y="341" class="lbl" text-anchor="middle">gradient update</text>
+  <text x="755" y="357" class="sub" text-anchor="middle">Muon + Adam</text>
+  <line x1="640" y1="330" x2="678" y2="330" class="flow" marker-end="url(#far)"/>
+
+  <!-- snapshot pool feedback -->
+  <rect x="470" y="408" width="190" height="40" rx="10" class="blk"/>
+  <text x="565" y="433" class="sub" text-anchor="middle">frozen snapshot pool → sampled as θ₁…θ₃</text>
+  <path d="M755,362 L755,428 L662,428" class="loop" marker-end="url(#fard)"/>
+  <path d="M468,428 L150,428 L150,408" class="loop" marker-end="url(#fard)"/>
+
+  <!-- legend -->
+  <line x1="40" y1="452" x2="74" y2="452" class="flow"/>
+  <text x="82" y="456" class="sub">forward / data flow</text>
+  <line x1="230" y1="452" x2="264" y2="452" class="loop"/>
+  <text x="272" y="456" class="sub">self-play feedback (updated weights become future opponents)</text>
+</svg>

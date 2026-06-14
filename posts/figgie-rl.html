@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>I tried to build a superhuman Figgie bot — Nerdsniped</title>
+<meta name="description" content="A build log: I wanted a superhuman self-play RL agent for Jane Street's card game Figgie. Here's everything I tried — encoding the order book as tokens, self-play with PPO (which beat a Bayesian heuristic), and reaching for Deep CFR to push further (which fought me the whole way).">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800;850&family=Source+Serif+4:opsz,wght@8..60,380;8..60,400;8..60,600;8..60,680&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
+<link rel="icon" type="image/jpeg" href="../assets/yt_logo.jpg">
+<link rel="stylesheet" href="../css/style.css">
+<script>document.documentElement.setAttribute('data-theme', localStorage.getItem('nerdsniped-theme')||'dark');</script>
+</head>
+<body>
+<header class="site">
+  <div class="wrap">
+    <a class="brand" href="../index.html"><img class="brandlogo" src="../assets/yt_logo.jpg" alt="nerdsniped logo">Nerd<span>sniped</span></a>
+    <nav class="sans"><a href="../index.html">Blog</a><a class="yt" href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">YouTube</a><a href="https://github.com/nerdsnipedYT" target="_blank" rel="noopener">GitHub</a><button id="themebtn" class="themebtn" aria-label="Toggle light/dark">☾</button></nav>
+  </div>
+</header>
+
+<article>
+  <div class="post-head">
+    <div class="kicker">Build log · reinforcement learning</div>
+    <h1 class="title">I tried to build a superhuman Figgie bot</h1>
+    <div class="byline">
+      <span>Nerdsniped</span><span class="dot">•</span><span>June 2026</span><span class="dot">•</span><span>~15 min read</span><span class="dot">•</span><span>self-play RL · a work in progress</span>
+    </div>
+  </div>
+
+  <p>I wanted to build a <strong>superhuman Figgie bot</strong>. Not a decent one — a <em>genuinely</em> scary one, the kind that sits down at <a href="https://www.figgie.com/" target="_blank" rel="noopener">Jane Street's little trading game</a> and quietly takes everyone's chips. This is the build log of that attempt: the idea, the things I tried, the one that worked, the one that fought me, and an honest accounting of how far I actually got. (Spoiler, so you can calibrate: <strong>not superhuman yet — but further than I expected, and I think I can see the rest of the road.</strong>)</p>
+
+  <p>Why Figgie? Because it's a beautiful target. Four players, a rigged 40-card deck, an open order book, and one hidden fact — the <em>goal suit</em> — that nobody is told but everybody can infer from the cards in their hand. You buy, sell, and post quotes in real time, and when the round ends the players holding the most of the goal suit split a pot. It's poker for people who like market microstructure: a tiny, fully-specified rulebook, a brutal amount of hidden information, and a reward you can compute exactly (chips at the end). If you wanted to hand-design an RL playground, it would look a lot like this.</p>
+
+  <p>My one rule for myself: <strong>no human games, no hand-written strategy.</strong> The bot would have to learn everything — the inference, the trading, the bluffing — by playing millions of games against copies of itself. The whole thing lives in <a href="https://github.com/nerdsnipedYT/FiggieRL" target="_blank" rel="noopener">FiggieRL</a>; what follows is the order I actually tried things in.</p>
+
+  <div class="kpis">
+    <div class="kpi"><div class="v">146</div><div class="k">discrete actions (buy / sell / quote / cancel)</div></div>
+    <div class="kpi"><div class="v">~149K</div><div class="k">parameters in the baseline transformer</div></div>
+    <div class="kpi"><div class="v">4</div><div class="k">players · 40 cards · one hidden goal suit</div></div>
+    <div class="kpi"><div class="v">1000s</div><div class="k">of games per training iteration, batched on GPU</div></div>
+  </div>
+
+  <h2><span class="num">1</span>Know the game, and pick something to beat</h2>
+
+  <p>Before you can build something superhuman you need to know what "human" even means here, so let me get the rules out of the way and then nail down two opponents to measure against.</p>
+
+  <p>The deck is deliberately lopsided. Of the four suits, one is the <strong>common suit</strong> with 12 cards, two have 10, and one has only 8. The <strong>goal suit is always the same-colour partner of the 12-card common suit</strong> — spades↔clubs, diamonds↔hearts — and you are never told which it is. At the end, everyone earns 10 chips per goal card they hold, and whoever holds the most splits a bonus pot (100 chips, or 120 when the goal happens to be the rare 8-card suit). Each player antes 50 to play.</p>
+
+  <p>Here is the whole game in one move: you can't see the goal suit, but you can see your own ten cards, and that is a surprisingly strong signal — <em>pointing the wrong way</em>. If you were dealt a lot of one suit, that suit is probably the 12-card <em>common</em> one, which means its partner is the goal. The suit you have the most of is the suit you should suspect <strong>least</strong>. A careful player computes, from their hand, the posterior probability that each suit is the goal, turns that into a fair value per card, and trades toward it.</p>
+
+  <figure class="tight">
+    <iframe src="../assets/figgie_fairvalue.html" height="440" loading="lazy" title="Bayesian fair value vs cards held"></iframe>
+    <figcaption><b>What your hand whispers.</b> Posterior probability that a suit is the goal (and the resulting fair value of one card), as a function of how many of that suit you were dealt — computed from the game's exact prior. The slope is <em>negative</em>: holding more of a suit is evidence it is the abundant common suit, so its partner, not it, is the prize. This counter-intuitive inference is the entire skill of Figgie, and it's what we're asking the network to rediscover.</figcaption>
+  </figure>
+
+  <p>I needed yardsticks — something concrete to point the bot at — so I wrote two reference opponents from scratch:</p>
+  <ul>
+    <li><strong>Random</strong> — picks uniformly among legal non-pass moves. The floor. If my bot can't beat this, nothing else matters.</li>
+    <li><strong>Tom</strong> — a Bayesian heuristic that computes the fair value above, hits any quote that crosses it by a margin, and otherwise posts tight quotes around fair value. Not optimal, but it <em>plays the inference</em> — it's roughly "a competent human who knows the trick." Beating Tom is the first sign of real skill.</li>
+  </ul>
+
+  <p>So here's my mental scoreboard for the whole project. <strong>Beat Random</strong> = the bot understands that cards have value. <strong>Beat Tom</strong> = it has learned the actual inference and can trade on it. <strong>Beat Tom by a <em>lot</em>, and stay unbeatable when opponents adapt</strong> = the superhuman dream. Everything below is me climbing that ladder.</p>
+
+  <h2><span class="num">2</span>Attempt 0: make Figgie speak transformer</h2>
+
+  <p>Before any learning could happen I had to decide how the bot even <em>sees</em> the game. A game of Figgie is a sequence of events: a deal, then a stream of public actions — someone posts a bid, someone lifts an offer, a trade prints. That is already shaped like language, so I treated it like one. Each player sees a <strong>token stream</strong>: the first token encodes their private opening hand, and every subsequent token encodes one public order-book event. A <strong>causal transformer</strong> (pre-norm self-attention interleaved with SwiGLU MLP blocks) reads the stream and, at each step, emits two things: a distribution over the next action and a scalar estimate of how many chips the player expects to walk away with.</p>
+
+  <p>The action space is a flat menu of <strong>146 discrete moves</strong>: pass; buy or sell each of the four suits at the current best quote; post a bid or an ask for a suit at one of 16 discrete price levels; cancel a resting quote; or mass-cancel. Illegal moves (selling a card you don't hold, quoting through your own resting order) are removed with an action mask before the softmax, so the policy only ever spends probability on legal actions.</p>
+
+  <figure class="wide">
+    <img src="../assets/figgie_arch.svg" alt="FiggieRL architecture: token sequence into a causal transformer with policy and value heads, and the self-play training loop">
+    <figcaption><b>The setup.</b> <em>Top:</em> the opening hand plus the running order-book events become a token sequence; a causal transformer maps it to a masked policy over 146 actions and a value estimate, with a KV-cache so rollouts stay cheap. <em>Bottom:</em> the self-play loop — the current policy <b>π</b> sits at a table with three opponents <b>θ</b> sampled from a frozen pool of its own past snapshots, thousands of games run in parallel on the GPU, end-of-game chips become the (zero-sum) reward, and a PPO or Deep-CFR update produces the next weights, which periodically re-enter the pool.</figcaption>
+  </figure>
+
+  <h2><span class="num">3</span>The engine: self-play on the GPU, against your own ghosts</h2>
+
+  <p>With the encoding settled, I needed a way to generate experience. My self-imposed rule — no human games — means the agent learns purely from itself. The core loop: take the current policy, seat it at a table with three opponents drawn from a <strong>pool of frozen past snapshots</strong> of itself, play a huge batch of games, and update on the results. Sampling old snapshots rather than always playing the very latest weights is the standard trick to keep self-play from chasing its own tail into a degenerate strategy — you have to stay good against a <em>distribution</em> of past selves, not just today's.</p>
+
+  <p>The reward is simply the chips you finish with, which makes the game (nearly) zero-sum across the four seats. To make millions of games affordable, the whole environment is re-implemented as a <strong>batched, vectorised engine</strong> that steps thousands of games at once on the GPU, with a KV-cache so each agent move is a single-token forward pass rather than a re-encode of the whole history. A readable single-game CPU implementation is kept alongside it purely as the reference oracle for tests.</p>
+
+  <div class="aside sans"><span class="lbl">Why this is harder than it looks</span>
+  Figgie is simultaneous-ish, imperfect-information, multi-agent, and zero-sum — the exact cocktail where naïve policy gradients can spin forever without converging. "Beat a random opponent" falls quickly; "beat an opponent who is also adapting" is a moving target; "play a Nash-ish strategy that can't be exploited" is the hard version. That ladder is exactly what the scorecard below measures.</div>
+
+  <h2><span class="num">4</span>Attempt 1: PPO, the workhorse — and the first real milestone</h2>
+
+  <p>For the first serious attempt I reached for the boring, reliable option: <strong>PPO</strong> (clipped policy-gradient with GAE), the workhorse of single-agent RL, pointed at the self-play loop. It is technically the "wrong" tool — Figgie is an imperfect-information game and PPO has no special machinery for that — but it's robust and I wanted a signal that the whole pipeline worked before getting fancy.</p>
+
+  <p>It worked better than I had any right to expect. Within minutes the bot blew past Random, and — the moment I'd actually been waiting for — it kept climbing and <strong>crossed Tom</strong>, the Bayesian heuristic, into positive territory: my best PPO runs finish at roughly <strong>+12 to +27 chips per game against Tom</strong> and as much as <strong>+74 against Random</strong>. A from-scratch transformer, fed nothing but chips, had reinvented the §1 inference well enough to out-trade a hand-written player that knows the trick. That's milestone one on the ladder, and it felt great.</p>
+
+  <figure>
+    <iframe src="../assets/figgie_algos.html" height="480" loading="lazy" title="PPO and Deep CFR against Tom and Random"></iframe>
+    <figcaption><b>The scoreboard for my two attempts.</b> Solid lines are score vs Tom; dotted are vs Random (higher is better throughout). The one to watch right now is <span style="color:#2e9e8f"><b>PPO</b></span>: its solid line climbs above zero, meaning it beats the heuristic. The <span style="color:#e0663a"><b>orange</b></span> lines are my next attempt, Deep CFR — hold that thought for §5. The x-axis is normalised training progress so the differently-sized runs overlay.</figcaption>
+  </figure>
+
+  <p>So why not just declare victory and scale PPO up? Because "beats Tom by +20" is a long way from <em>superhuman</em>. PPO self-play has a known failure mode in these games: it can settle into a strategy that's good on average but <strong>exploitable</strong> — beatable by an opponent that adapts specifically to it. To chase the unbeatable version, I wanted the algorithm that was actually designed for hidden-information games. Which brings me to the part that humbled me.</p>
+
+  <h2><span class="num">5</span>Attempt 2: Deep CFR, reaching for "unexploitable"</h2>
+
+  <p><strong>Deep CFR</strong> is the deep-learning descendant of counterfactual regret minimisation — the algorithm family that solved heads-up poker. Unlike PPO it comes with a convergence story toward a Nash-ish, hard-to-exploit strategy, which is <em>exactly</em> the property I want for a superhuman bot. On paper it's the right tool. In practice it spent a while reminding me that "on paper" does a lot of work.</p>
+
+  <p>The first CFR run literally <strong>scored worse than Random</strong> — the regret targets exploded and the policy diverged. Getting it to even train took a checklist of fixes: scaling the reward down, clipping regrets and gradients to sane ranges, and forcing a healthy exploration floor so the strategy networks saw enough of the game. Only after all that did it start behaving.</p>
+
+  <p>And once it behaved, it learned — just not far enough, yet. Over ~12k steps (about 27 minutes on one GPU) it climbs to a solid <strong>+25 to +30 chips against Random</strong> and holds there, while against Tom it claws upward from about −58 to the −30s but <em>never crosses zero</em>. So my fancier, theoretically-better attempt currently sits <strong>behind</strong> my boring one. That's the honest state of things.</p>
+
+  <figure>
+    <iframe src="../assets/figgie_learning.html" height="460" loading="lazy" title="Deep CFR learning curves vs Random and vs Tom"></iframe>
+    <figcaption><b>Deep CFR, chips won per game.</b> Against <span style="color:#e0663a"><b>Random</b></span> it goes solidly positive within a few thousand steps and stays. Against <span style="color:#5b6c8f"><b>Tom</b></span> it improves by ~20 chips but never reaches break-even — it's learning the right things, just not enough of them in the runs I've done so far.</figcaption>
+  </figure>
+
+  <p>The reassuring part: this isn't a broken-self-play problem, it's a not-done-yet problem. The training health looks fine — mean reward sits near zero (as it should in a zero-sum game against your own snapshots) and the <strong>win rate climbs past the 0.25 line that four equal players start at</strong>, up to ~0.37, so the live policy really is outgrowing its frozen ghosts. The huge reward variance (a single deal swings ±60 chips) is just the cost of a card game, and the reason every update digests thousands of games.</p>
+
+  <figure>
+    <iframe src="../assets/figgie_selfplay.html" height="440" loading="lazy" title="Deep CFR self-play reward and win rate"></iframe>
+    <figcaption><b>Self-play health (Deep CFR run).</b> Mean reward (orange, ±1 std band) rises from −40 toward the zero-sum equilibrium against the snapshot pool; win rate (purple, right axis) climbs from the 0.20s through the <em>0.25 four-player floor</em> to ~0.37. Healthy training — the ceiling is run length and tuning, not a sick optimiser.</figcaption>
+  </figure>
+
+  <h2><span class="num">6</span>So… am I superhuman yet?</h2>
+
+  <p>No. But here's the scoreboard, honestly tallied. Positive vs-Random means "better than a random player"; positive vs-Tom means "better than a competent Bayesian human-ish player":</p>
+
+  <div class="tbl-wrap"><table class="res sans">
+    <thead><tr><th>agent</th><th>vs Random (best)</th><th>vs Tom (best)</th><th>win rate</th><th>verdict</th></tr></thead>
+    <tbody>
+      <tr><td><span class="tag" style="background:#7c7c88"></span>Random</td><td>0 (by def.)</td><td>—</td><td>0.25</td><td>the floor</td></tr>
+      <tr><td><span class="tag" style="background:#5b6c8f"></span>Tom <span style="color:#8a8a96">(heuristic)</span></td><td>—</td><td>0 (by def.)</td><td>—</td><td>the bar</td></tr>
+      <tr><td><span class="tag" style="background:#2e9e8f"></span>PPO self-play</td><td class="hi">+74.0</td><td class="hi">+12&nbsp;to&nbsp;+27</td><td>—</td><td>clears the bar ✓</td></tr>
+      <tr><td><span class="tag" style="background:#e0663a"></span>Deep-CFR self-play</td><td class="hi">+31.5</td><td>−31.7</td><td>0.37</td><td>beats floor, chasing bar</td></tr>
+    </tbody>
+  </table></div>
+
+  <p>What I've actually got is a bot that <strong>convincingly beats a random player and out-trades a solid heuristic</strong>, learned entirely from self-play with no human games — which honestly delights me — and a clear, unfinished road to "superhuman" from here. The §1 inference, the thing that <em>is</em> Figgie, emerged from chips alone. That's the headline I'm keeping.</p>
+
+  <div class="aside sans"><span class="lbl">The thing the project taught me</span>
+  The most-cited fact I walked away with isn't about Figgie, it's about RL engineering: my <em>theoretically better</em> algorithm (Deep CFR) lost, for now, to my <em>boring reliable</em> one (PPO) — purely because CFR was harder to stabilise and I gave it shorter runs. Pedigree on paper means nothing until the reward scaling, clipping, exploration, and run length are right. The algorithm choice was the easy decision; the engineering around it was the whole game.</div>
+
+  <h2><span class="num">7</span>What I'm trying next</h2>
+  <p>The road to superhuman, as I currently see it:</p>
+  <ul>
+    <li><strong>Let Deep CFR cook.</strong> Longer runs with the stabilisers properly tuned, to see whether its unexploitability story finally overtakes PPO once it has the time poker-scale CFR usually needs.</li>
+    <li><strong>Harden against exploitation.</strong> A bigger, more diverse opponent pool — and ideally an explicit exploitability check — so "wins on average" becomes "can't be picked apart by an adapting opponent."</li>
+    <li><strong>Open the hood.</strong> Probe the value head to see whether the transformer has genuinely reconstructed the goal-suit posterior internally, or is winning via some shortcut that merely correlates with it. That tells me whether I'm building a trader or a lookup table.</li>
+    <li><strong>Then, the real test:</strong> put it in front of strong human Figgie players and find out how much of "beats my heuristic" survives contact with people who bluff back.</li>
+  </ul>
+
+  <div class="aside sans"><span class="lbl">📺 nerdsniped on YouTube</span>
+  This post is the written companion to <a href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">nerdsniped</a> — deepdives into mathsy side quests. If you'd rather watch the Figgie bot get nerd-sniped into existence than read about it, <a href="https://www.youtube.com/@nerdsnipedYT" target="_blank" rel="noopener">the channel is here</a>.</div>
+
+  <hr>
+  <p class="sans" style="font-size:15px;color:#8a8a96">
+  <strong>Reproducibility.</strong> Everything is from-scratch PyTorch: a causal transformer (pre-norm attention + SwiGLU) with a masked 146-action policy head and a scalar value head, trained by self-play with a frozen snapshot pool, optimised with Muon + Adam. The batched GPU engine vectorises thousands of Figgie games at once; a readable single-game CPU implementation serves as the test oracle. Two reference opponents — uniform-Random and a Bayesian-fair-value heuristic (Tom) — are the benchmarks; scores are mean chips per game. Curves are read directly from the experiments' TensorBoard logs (Deep-CFR run <code>cfr_run2_fixed</code>, 12k steps; legacy PPO run <code>v29</code>); the fair-value figure is computed from the game's exact deal prior. Each run is fully specified by a <code>config.json</code> that re-creates its architecture and every hyperparameter.
+  </p>
+</article>
+
+<footer class="site">
+  <div class="wrap">© 2026 Nerdsniped · thanks for reading · the plots are live — drag, zoom, hover</div>
+</footer>
+
+<script>
+// --- KaTeX: render once the auto-render script has loaded (retry to dodge CDN/defer races) ---
+(function(){
+  var tries=0;
+  function render(){
+    if (window.renderMathInElement){
+      renderMathInElement(document.body,{
+        delimiters:[{left:"$$",right:"$$",display:true},{left:"$",right:"$",display:false}],
+        throwOnError:false
+      });
+    } else if (tries++ < 40){ setTimeout(render,100); }
+  }
+  if (document.readyState!=="loading") render();
+  else document.addEventListener("DOMContentLoaded", render);
+})();
+
+// --- theme toggle + broadcast to figure iframes ---
+(function(){
+  var KEY='nerdsniped-theme';
+  function cur(){ return localStorage.getItem(KEY)||'dark'; }
+  function postAll(t){ document.querySelectorAll('iframe').forEach(function(f){ try{ f.contentWindow.postMessage({theme:t},'*'); }catch(e){} }); }
+  function set(t){
+    document.documentElement.setAttribute('data-theme',t);
+    localStorage.setItem(KEY,t);
+    var b=document.getElementById('themebtn'); if(b) b.textContent = (t==='dark'?'☀':'☾');
+    postAll(t);
+  }
+  function init(){
+    set(cur());
+    var b=document.getElementById('themebtn'); if(b) b.addEventListener('click',function(){ set(cur()==='dark'?'light':'dark'); });
+    document.querySelectorAll('iframe').forEach(function(f){ f.addEventListener('load',function(){ try{ f.contentWindow.postMessage({theme:cur()},'*'); }catch(e){} }); });
+  }
+  if (document.readyState!=="loading") init();
+  else document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>
