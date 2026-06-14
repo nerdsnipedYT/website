@@ -1,0 +1,947 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Policy Gradients → PPO, GRPO &amp; CFR — by way of Figgie self-play — Nerdsniped</title>
+<meta name="description" content="A self-contained guided derivation: from the policy gradient theorem to PPO, GRPO and CFR, taught on Figgie self-play. The theory companion to the FiggieRL build log." />
+<link rel="icon" type="image/jpeg" href="../assets/yt_logo.jpg" />
+
+<!-- MathJax -->
+<script>
+  window.MathJax = {
+    tex: {
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']],
+      tags: 'none'
+    },
+    svg: { fontCache: 'global' },
+    options: { skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'] }
+  };
+</script>
+<script async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+
+<style>
+  :root{
+    --bg:        #fbfaf7;
+    --panel:     #ffffff;
+    --ink:       #1d2127;
+    --ink-soft:  #4a4f57;
+    --ink-faint: #8b9099;
+    --line:      #e7e3da;
+    --accent:    #3b5bdb;
+    --accent-2:  #7048e8;
+    --gold:      #b8860b;
+    --green:     #2b8a3e;
+    --red:       #c92a2a;
+    --code-bg:   #1b1e26;
+    --code-ink:  #e6e6e6;
+    --max:       760px;
+    --serif: "Iowan Old Style", "Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif;
+    --sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, system-ui, sans-serif;
+    --mono: "SF Mono", "JetBrains Mono", "Fira Code", ui-monospace, Menlo, Consolas, monospace;
+  }
+  *{ box-sizing:border-box; }
+  html{ scroll-behavior:smooth; }
+  body{
+    margin:0; background:var(--bg); color:var(--ink);
+    font-family:var(--serif); font-size:19px; line-height:1.68;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* reading progress bar */
+  #progress{
+    position:fixed; top:0; left:0; height:3px; width:0%;
+    background:linear-gradient(90deg,var(--accent),var(--accent-2));
+    z-index:1000; transition:width .1s linear;
+  }
+
+  /* layout */
+  .wrap{ display:grid; grid-template-columns: 290px minmax(0,1fr); gap:0; }
+  nav.toc{
+    position:sticky; top:0; align-self:start; height:100vh; overflow-y:auto;
+    border-right:1px solid var(--line); padding:30px 22px 60px 30px;
+    background:linear-gradient(180deg,#fbfaf7, #f6f4ee);
+    font-family:var(--sans);
+  }
+  nav.toc .brand{ font-weight:700; font-size:15px; letter-spacing:.02em; color:var(--ink); margin-bottom:4px; }
+  nav.toc .brandsub{ font-size:12.5px; color:var(--ink-faint); margin-bottom:22px; line-height:1.4; }
+  nav.toc ol{ list-style:none; margin:0; padding:0; counter-reset:sec; }
+  nav.toc li{ margin:0; }
+  nav.toc a{
+    display:block; text-decoration:none; color:var(--ink-soft);
+    font-size:13.5px; padding:5px 10px; border-radius:7px; border-left:2px solid transparent;
+    transition:all .12s;
+  }
+  nav.toc a:hover{ background:#eceae3; color:var(--ink); }
+  nav.toc a.top{ counter-increment:sec; font-weight:600; }
+  nav.toc a.top::before{ content:counter(sec) "."; color:var(--accent); font-weight:700; margin-right:7px; }
+  nav.toc a.sub{ font-size:12.5px; padding-left:30px; color:var(--ink-faint); }
+  nav.toc a.active{ background:#e7ecfb; color:var(--accent); border-left-color:var(--accent); }
+  nav.toc a.sub.active{ background:#eef1fc; }
+  nav.toc .meta{ margin-top:26px; padding-top:18px; border-top:1px solid var(--line); font-size:12px; color:var(--ink-faint); line-height:1.5; }
+
+  main{ padding:0; }
+  .col{ max-width:var(--max); margin:0 auto; padding:64px 34px 140px; }
+
+  /* hero */
+  .hero{ border-bottom:1px solid var(--line); }
+  .eyebrow{ font-family:var(--sans); font-size:13px; font-weight:600; letter-spacing:.16em; text-transform:uppercase; color:var(--accent); }
+  h1{ font-family:var(--sans); font-weight:800; font-size:42px; line-height:1.1; letter-spacing:-.02em; margin:14px 0 12px; }
+  .lede{ font-size:21px; color:var(--ink-soft); line-height:1.55; }
+  .readbar{ display:flex; gap:26px; flex-wrap:wrap; font-family:var(--sans); font-size:13px; color:var(--ink-faint); margin-top:26px; }
+  .readbar b{ color:var(--ink); font-weight:600; }
+
+  h2{ font-family:var(--sans); font-weight:750; font-size:30px; letter-spacing:-.015em; margin:0 0 6px; line-height:1.15; }
+  .h2num{ font-family:var(--sans); color:var(--accent); font-weight:800; font-size:15px; letter-spacing:.05em; }
+  h3{ font-family:var(--sans); font-weight:700; font-size:21px; margin:42px 0 6px; letter-spacing:-.01em; }
+  h4{ font-family:var(--sans); font-weight:700; font-size:16px; margin:28px 0 4px; color:var(--ink); text-transform:none; }
+  section{ scroll-margin-top:20px; }
+  section.major{ padding-top:60px; margin-top:46px; border-top:1px solid var(--line); }
+  p{ margin:16px 0; }
+  a.ref{ color:var(--accent); text-decoration:none; border-bottom:1px solid #c3cdf3; }
+  a.ref:hover{ border-bottom-color:var(--accent); }
+  strong{ font-weight:680; }
+  em.term{ font-style:normal; font-weight:680; color:var(--accent-2); }
+
+  ul,ol{ padding-left:24px; }
+  li{ margin:8px 0; }
+
+  /* callouts */
+  .box{ border-radius:12px; padding:18px 22px; margin:26px 0; font-size:17.5px; line-height:1.6; border:1px solid var(--line); }
+  .box .lbl{ font-family:var(--sans); font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; display:inline-flex; align-items:center; gap:7px; margin-bottom:8px; }
+  .box p:first-of-type{ margin-top:4px; } .box p:last-child{ margin-bottom:0; }
+  .intuition{ background:#eef3ff; border-color:#cdd9fb; }
+  .intuition .lbl{ color:var(--accent); }
+  .figgie{ background:#fff8e8; border-color:#f0e0b0; }
+  .figgie .lbl{ color:var(--gold); }
+  .pitfall{ background:#fff0f0; border-color:#f6cccc; }
+  .pitfall .lbl{ color:var(--red); }
+  .key{ background:#ecfaef; border-color:#bfe6c8; }
+  .key .lbl{ color:var(--green); }
+  .recap{ background:#f3f1ff; border-color:#dad3f7; }
+  .recap .lbl{ color:var(--accent-2); }
+
+  /* math display safety */
+  mjx-container{ overflow-x:auto; overflow-y:hidden; max-width:100%; }
+  .eqwrap{ margin:22px 0; }
+
+  /* code */
+  pre{ background:var(--code-bg); color:var(--code-ink); border-radius:11px; padding:20px 22px; overflow-x:auto;
+       font-family:var(--mono); font-size:14px; line-height:1.62; margin:24px 0; }
+  pre .c{ color:#7f8aa0; font-style:italic; } /* comment */
+  pre .k{ color:#c792ea; }  /* keyword */
+  pre .f{ color:#82aaff; }  /* function */
+  pre .s{ color:#c3e88d; }  /* string */
+  pre .n{ color:#f78c6c; }  /* number */
+  pre .v{ color:#ffcb6b; }  /* var emphasis */
+  code{ font-family:var(--mono); font-size:.84em; background:#efece3; padding:2px 6px; border-radius:5px; color:#774; }
+  pre code{ background:none; padding:0; color:inherit; font-size:inherit; }
+
+  /* details / derivation */
+  details{ border:1px solid var(--line); border-radius:10px; margin:22px 0; background:var(--panel); overflow:hidden; }
+  details summary{ cursor:pointer; padding:14px 20px; font-family:var(--sans); font-weight:650; font-size:14.5px; color:var(--accent); list-style:none; user-select:none; background:#f7f6f1; }
+  details summary::-webkit-details-marker{ display:none; }
+  details summary::before{ content:"▸ "; color:var(--accent); }
+  details[open] summary::before{ content:"▾ "; }
+  details[open] summary{ border-bottom:1px solid var(--line); }
+  details .inner{ padding:6px 22px 14px; font-size:17px; }
+
+  /* tables */
+  table{ border-collapse:collapse; width:100%; margin:26px 0; font-size:15px; font-family:var(--sans); }
+  th,td{ border:1px solid var(--line); padding:10px 13px; text-align:left; vertical-align:top; }
+  th{ background:#f3f1ea; font-weight:700; font-size:13px; letter-spacing:.02em; }
+  td.suit{ text-align:center; font-size:18px; }
+  tr:nth-child(even) td{ background:#fcfbf8; }
+
+  /* figure */
+  figure{ margin:30px 0; text-align:center; }
+  figure svg{ max-width:100%; height:auto; background:var(--panel); border:1px solid var(--line); border-radius:12px; padding:10px; }
+  figcaption{ font-family:var(--sans); font-size:13px; color:var(--ink-faint); margin-top:10px; line-height:1.5; }
+
+  .suit-red{ color:#c92a2a; } .suit-blk{ color:#1d2127; }
+  hr.soft{ border:none; border-top:1px solid var(--line); margin:40px 0; }
+
+  .pill{ display:inline-block; font-family:var(--sans); font-size:11.5px; font-weight:700; padding:2px 9px; border-radius:20px; background:#e7ecfb; color:var(--accent); letter-spacing:.03em; vertical-align:middle; }
+  .pill.repo{ background:#fff3d6; color:var(--gold); }
+
+  @media (max-width: 900px){
+    .wrap{ grid-template-columns:1fr; }
+    nav.toc{ position:static; height:auto; border-right:none; border-bottom:1px solid var(--line); }
+    .col{ padding:40px 22px 100px; }
+    h1{ font-size:32px; } body{ font-size:18px; }
+  }
+</style>
+</head>
+<body>
+<div id="progress"></div>
+
+<div class="wrap">
+<!-- ───────────────────────── SIDEBAR ───────────────────────── -->
+<nav class="toc" id="toc">
+  <a href="../index.html" style="display:flex;align-items:center;gap:8px;text-decoration:none;color:var(--ink);font-family:var(--sans);font-weight:700;font-size:14px;margin-bottom:6px">
+    <img src="../assets/yt_logo.jpg" alt="" style="width:24px;height:24px;border-radius:6px;border:1px solid var(--line)">Nerd<span style="color:var(--accent)">sniped</span>
+  </a>
+  <div style="font-family:var(--sans);font-size:12px;margin-bottom:18px"><a href="figgie-rl.html" style="color:var(--accent);text-decoration:none">← The FiggieRL build log</a></div>
+  <div class="brand">Policy Gradients, end to end</div>
+  <div class="brandsub">REINFORCE → Actor–Critic → PPO → GRPO → CFR, taught on Figgie self-play.</div>
+  <ol>
+    <li><a class="top" href="#setup">The Figgie testbed</a></li>
+    <li><a class="top" href="#why">Why policies, not values</a></li>
+    <li><a class="top" href="#pgt">The policy gradient theorem</a></li>
+    <li><a class="top" href="#reinforce">REINFORCE &amp; baselines</a></li>
+    <li><a class="top" href="#ac">Actor–Critic &amp; GAE</a></li>
+    <li><a class="top" href="#ppo">PPO</a></li>
+    <li><a class="top" href="#grpo">GRPO</a></li>
+    <li><a class="top" href="#cfr">Counterfactual Regret Min.</a></li>
+    <li><a class="top" href="#deepcfr">Deep CFR</a></li>
+    <li><a class="top" href="#compare">Choosing an algorithm</a></li>
+    <li><a class="top" href="#refs">References</a></li>
+  </ol>
+  <div class="meta">
+    A self-contained read for the <b>FiggieRL</b> project.<br>~45&nbsp;min. Assumes MDPs,
+    value iteration and Q-learning. Math renders via MathJax.
+  </div>
+</nav>
+
+<!-- ───────────────────────── CONTENT ───────────────────────── -->
+<main>
+<div class="col">
+
+<!-- HERO -->
+<header class="hero" style="border:none;padding-bottom:10px;">
+  <div class="eyebrow">A guided derivation</div>
+  <h1>From the policy gradient theorem to PPO, GRPO&nbsp;&amp; CFR</h1>
+  <p class="lede">Everything you need to <em class="term">fully understand</em> the three algorithms that matter for training a Figgie agent by self-play — built up from first principles, one idea at a time, with every formula cashed out on the actual game.</p>
+  <div class="readbar">
+    <span>⏱ <b>~45&nbsp;minute</b> read</span>
+    <span>📐 <b>Derivations</b> included, collapsible</span>
+    <span>🎯 Goal: <b>PPO · GRPO · CFR</b></span>
+    <span>🃏 Grounded in <b>self-play Figgie</b></span>
+  </div>
+  <p style="font-size:15px;color:var(--ink-faint);font-family:var(--sans);margin-top:22px;">
+    You already know MDPs, the Bellman equations, value iteration and Q-learning. We pick up exactly where that leaves off: those methods learn <em>values</em> and read a policy off them. Here we learn the <em>policy directly</em>. By the end you'll see PPO, GRPO and CFR as three answers to one question — <strong>how do you safely improve a policy from samples?</strong>
+  </p>
+</header>
+
+<!-- ════════════ 1. SETUP ════════════ -->
+<section id="setup" class="major">
+  <div class="h2num">SECTION 1</div>
+  <h2>The Figgie testbed</h2>
+
+  <p>Every algorithm below is explained on one running problem: <strong>train a neural network to play Figgie well, using only games it plays against copies of itself.</strong> Before any RL, we need the game pinned down as an environment.</p>
+
+  <h3>The game in one paragraph</h3>
+  <p>Figgie is Jane Street's trading card game. A 40-card deck has four suits dealt in counts <strong>{12, 10, 10, 8}</strong> — but you don't know which suit got which count. The 12-card suit fixes the <em class="term">goal suit</em>: it is the other suit of the <em>same colour</em> (♠–♣ are black, ♦–♥ are red). The goal suit therefore has 8 or 10 cards. Four players are dealt 10 cards each, ante \$50 into a \$200 pot, then trade single cards in an open <em class="term">continuous double auction</em> for a few minutes — anyone may post a bid or an ask, or hit a standing quote. When time expires, each goal-suit card pays \$10, and whoever holds the <em>most</em> goal-suit cards takes the remainder of the pot. Your edge comes from inferring the goal suit faster than the table and buying it cheap.</p>
+
+  <div class="box figgie">
+    <div class="lbl">🃏 Why Figgie is a great RL teaching domain</div>
+    <p>It hits every hard case at once: <strong>sparse reward</strong> (you only learn who won at the end), <strong>imperfect information</strong> (you never see the other hands — this is what makes CFR relevant), <strong>multi-agent non-stationarity</strong> (your opponents are also learning), and a <strong>large structured action space</strong> (post/cancel/lift quotes across four suits at sixteen prices). PPO and GRPO will tackle the first three; CFR speaks directly to the second.</p>
+  </div>
+
+  <h3>Casting it as an MDP (from the learner's seat)</h3>
+  <p>We train <em>one</em> network. From its seat, the other three players are part of the environment. Concretely, matching the <span class="pill repo">figgie/</span> implementation:</p>
+
+  <table>
+    <tr><th>MDP element</th><th>In FiggieRL</th></tr>
+    <tr><td><strong>State</strong> \(s_t\)</td><td>The full history this seat has observed: its 10-card opening hand plus the running sequence of public market events (quotes posted, trades executed). The network is a <strong>causal Transformer</strong> over this token sequence — the <code>tokens</code> tensor of shape <code>[B, T, 96]</code>. The sequence <em>is</em> the state; attention is the memory.</td></tr>
+    <tr><td><strong>Action</strong> \(a_t\)</td><td>One of <strong>146 discrete actions</strong>: <code>PASS</code>, <code>BUY(suit)</code>, <code>SELL(suit)</code>, <code>QUOTE_BID(suit, price)</code>, <code>QUOTE_ASK(suit, price)</code> over 4 suits × 16 prices, plus cancels and <code>MASS_CANCEL</code>. Illegal actions are removed each step by a boolean <code>valid_action_mask</code> before the softmax.</td></tr>
+    <tr><td><strong>Policy</strong> \(\pi_\theta(a\mid s)\)</td><td>The Transformer's masked softmax head: a categorical distribution over the 146 actions, conditioned on the whole sequence so far.</td></tr>
+    <tr><td><strong>Reward</strong> \(r_t\)</td><td>The seat's <strong>chip delta</strong> at that step: cash paid/received on a trade, and at the final step the goal-suit payout. Everyone antes \(-\$50\) up front (<code>chips = -50</code>). It is <strong>sparse and end-loaded</strong> — most steps give \(0\), the score lands at the end.</td></tr>
+    <tr><td><strong>Episode</strong> \(\tau\)</td><td>One game: up to <code>max_actions</code> ≈ 100 decision steps, then <code>score_games</code> settles the pot.</td></tr>
+    <tr><td><strong>Return</strong> \(R(\tau)\)</td><td>Net chips at game end — the seat's profit. This is the thing we want to maximise in expectation.</td></tr>
+  </table>
+
+  <div class="box pitfall">
+    <div class="lbl">⚠ It is really a POMDP</div>
+    <p>You never observe the opponents' hands or the true goal suit, so the "state" is a <em>history</em>, not a Markov snapshot of the world. We handle this the standard deep-RL way — feed the whole observed history to a sequence model and let it learn a sufficient statistic (a belief state) in its hidden activations. Keep this in your back pocket: it is precisely the gap that <strong>CFR</strong> (§8) addresses head-on with <em>information sets</em> instead of papering over with a recurrent/attention encoder.</p>
+  </div>
+
+  <h3>What "self-play" means here</h3>
+  <p>There is no fixed opponent to learn against; the environment's difficulty must rise with the learner. FiggieRL fills the other three seats from a <em class="term">pool</em>: heuristic experts (<code>TomPlayer</code>, which prices each suit at a fair value derived from \(P(\text{goal}\mid \text{hand})\); <code>RandomPlayer</code>) plus <strong>frozen snapshots of the learner's own past weights</strong>, saved every <code>snapshot_every</code> iterations. Training against a distribution of past selves is what stops the policy from chasing one exploitable opponent and forgetting how to play in general.</p>
+
+  <div class="box key">
+    <div class="lbl">✦ The one objective behind everything</div>
+    <p>Let \(\pi_\theta\) be our policy with parameters \(\theta\). Every algorithm in this document is a different way to push \(\theta\) up the same hill:</p>
+    \[ J(\theta) \;=\; \mathbb{E}_{\tau \sim \pi_\theta}\!\big[\,R(\tau)\,\big] \;=\; \mathbb{E}_{\tau \sim \pi_\theta}\!\Big[\textstyle\sum_{t} \gamma^{t} r_t\Big]. \]
+    <p style="margin-bottom:0">We want \(\theta^\star=\arg\max_\theta J(\theta)\): the weights whose games earn the most chips on average. The trajectory distribution \(\tau\sim\pi_\theta\) <em>depends on \(\theta\)</em> — that dependence is the whole technical difficulty, and the next section is about getting a gradient through it.</p>
+  </div>
+</section>
+
+<!-- ════════════ 2. WHY POLICIES ════════════ -->
+<section id="why" class="major">
+  <div class="h2num">SECTION 2</div>
+  <h2>Why learn a policy, not a value</h2>
+
+  <p>You already know the value-based recipe: learn \(Q^\star(s,a)\), then act greedily, \(\pi(s)=\arg\max_a Q(s,a)\). It is beautiful when it works. Figgie breaks three of its assumptions, and seeing exactly how motivates everything that follows.</p>
+
+  <h4>1. The action space is large and structured.</h4>
+  <p>A \(\max_a Q(s,a)\) needs a value for all 146 actions <em>every step</em>, and the greedy argmax gives a brittle, deterministic trader. Worse, in a betting/trading game a deterministic policy is <strong>exploitable</strong>: opponents learn you always lift the ask at \$8 and front-run you. We will need <em>stochastic</em> policies, which the argmax fundamentally is not.</p>
+
+  <h4>2. Imperfect information demands randomisation.</h4>
+  <p>This is the deep one. In games where you hide information, the optimal strategy is often <em>genuinely mixed</em> — like bluffing in poker. There is no deterministic best response to randomise against; the Nash strategy assigns positive probability to several actions in the same situation. A value function plus argmax <em>cannot represent</em> such a policy. A parameterised distribution \(\pi_\theta(a\mid s)\) can. (Hold this thought for §8.)</p>
+
+  <h4>3. We want to optimise the thing we care about, directly.</h4>
+  <p>Value methods optimise a <em>surrogate</em> (Bellman error) and hope a good policy falls out. Policy-gradient methods differentiate \(J(\theta)\) — expected chips — and step \(\theta\) straight up that gradient. The objective you train is the objective you want.</p>
+
+  <div class="box intuition">
+    <div class="lbl">💡 The reframing</div>
+    <p>Value iteration asks "how good is each state/action?" and acts greedily. Policy gradients ask "<strong>nudge the knobs \(\theta\) so that whatever I just did, if it paid off, becomes more likely.</strong>" No bootstrapped value estimate is required to <em>define</em> the update — though, as we'll see, a value estimate is the single best tool for making that update less noisy. That tension — pure policy gradient vs. a helper critic — is the through-line from REINFORCE to PPO.</p>
+  </div>
+</section>
+
+<!-- ════════════ 3. POLICY GRADIENT THEOREM ════════════ -->
+<section id="pgt" class="major">
+  <div class="h2num">SECTION 3</div>
+  <h2>The policy gradient theorem</h2>
+
+  <p>We want \(\nabla_\theta J(\theta)\). The obstacle is that the expectation is taken over a distribution that <em>itself</em> depends on \(\theta\): change the weights and you change which games get played. You cannot just push the gradient inside the expectation. The fix is a one-line identity that the entire field rests on.</p>
+
+  <h3>The log-derivative ("score function") trick</h3>
+  <p>For any distribution \(p_\theta(x)\) and function \(f\), use \(\nabla_\theta p_\theta = p_\theta \nabla_\theta \log p_\theta\):</p>
+  \[ \nabla_\theta\, \mathbb{E}_{x\sim p_\theta}[f(x)] = \nabla_\theta\!\!\int p_\theta(x) f(x)\,dx = \int p_\theta(x)\,\nabla_\theta\!\log p_\theta(x)\, f(x)\,dx = \mathbb{E}_{x\sim p_\theta}\!\big[ f(x)\,\nabla_\theta \log p_\theta(x)\big]. \]
+  <p>This converts "gradient of an expectation" — which we can't sample — into "expectation of a gradient", which we <em>can</em>: play games, evaluate the bracket on each, average. Now apply it with \(x=\tau\) and \(f=R\).</p>
+
+  <details>
+    <summary>Full derivation: from \(J(\theta)\) to the score-function estimator</summary>
+    <div class="inner">
+      <p>A trajectory's probability factorises along the chain. With environment dynamics \(p(s_{t+1}\mid s_t,a_t)\) and initial state \(\rho(s_0)\):</p>
+      \[ p_\theta(\tau) = \rho(s_0)\prod_{t=0}^{T-1} \pi_\theta(a_t\mid s_t)\,p(s_{t+1}\mid s_t,a_t). \]
+      <p>Take logs — products become sums:</p>
+      \[ \log p_\theta(\tau) = \log\rho(s_0) + \sum_{t} \log \pi_\theta(a_t\mid s_t) + \sum_{t}\log p(s_{t+1}\mid s_t,a_t). \]
+      <p>Differentiate w.r.t. \(\theta\). The dynamics and the initial distribution <strong>do not depend on \(\theta\)</strong>, so their gradients vanish — <em>we never need a model of the environment</em>:</p>
+      \[ \nabla_\theta \log p_\theta(\tau) = \sum_{t} \nabla_\theta \log \pi_\theta(a_t\mid s_t). \]
+      <p>Substitute into the score-function identity with \(f(\tau)=R(\tau)\):</p>
+      \[ \boxed{\;\nabla_\theta J(\theta) = \mathbb{E}_{\tau\sim\pi_\theta}\!\Big[\, R(\tau)\,\textstyle\sum_{t}\nabla_\theta \log \pi_\theta(a_t\mid s_t)\Big].\;} \]
+    </div>
+  </details>
+
+  <div class="box key">
+    <div class="lbl">✦ The policy gradient theorem</div>
+    \[ \nabla_\theta J(\theta) \;=\; \mathbb{E}_{\tau\sim\pi_\theta}\!\bigg[\, \sum_{t=0}^{T-1} \nabla_\theta \log\pi_\theta(a_t\mid s_t)\;\underbrace{\Big(\sum_{t'\ge t}\gamma^{\,t'-t} r_{t'}\Big)}_{\text{return-to-go } \;\hat A_t \text{ (raw)}}\bigg]. \]
+    <p style="margin-bottom:0">Two refinements are already baked in versus the boxed version above. (1) <strong>Causality</strong>: an action at time \(t\) can only influence <em>future</em> reward, so we replace the whole-episode return \(R(\tau)\) by the <em>return-to-go</em> \(G_t=\sum_{t'\ge t}\gamma^{t'-t}r_{t'}\). (2) That weight in front of each \(\nabla\log\pi\) is the prototype of what we'll soon call the <strong>advantage</strong>.</p>
+  </div>
+
+  <h3>Reading the formula</h3>
+  <p>Each term is \(\nabla_\theta \log\pi_\theta(a_t\mid s_t)\) scaled by a number. The gradient \(\nabla\log\pi_\theta(a_t\mid s_t)\) points in parameter space in the direction that makes action \(a_t\) <em>more probable</em> in state \(s_t\). Multiply by the return-to-go and sum:</p>
+  <ul>
+    <li>Action led to a <strong>positive</strong> outcome (\(G_t&gt;0\)) → step <em>toward</em> making it more likely.</li>
+    <li>Action led to a <strong>negative</strong> outcome (\(G_t&lt;0\)) → step <em>away</em>, making it less likely.</li>
+    <li>Magnitude scales with how good/bad. <strong>That's the whole idea: reinforce what paid, suppress what cost — weighted by how much.</strong></li>
+  </ul>
+
+  <div class="box figgie">
+    <div class="lbl">🃏 On the board</div>
+    <p>Mid-game your network posts <code>QUOTE_BID(♥, 7)</code> — a bid of \$7 for a heart. The game plays out and that seat ends <strong>+\$40</strong>. The update nudges \(\theta\) so that, in sequences that look like that one, \(\pi_\theta\) puts <em>more</em> mass on bidding \$7 for hearts. Notice the catch that the rest of this document exists to fix: the +\$40 is credited to <em>every</em> action in the game, including the irrelevant <code>PASS</code>es and a possibly <em>bad</em> heart bid that just got bailed out by good luck later. The raw signal is correct <em>on average</em> but drowning in noise.</p>
+  </div>
+</section>
+
+<!-- ════════════ 4. REINFORCE ════════════ -->
+<section id="reinforce" class="major">
+  <div class="h2num">SECTION 4</div>
+  <h2>REINFORCE &amp; the variance problem</h2>
+
+  <p>Turn the theorem into an algorithm by replacing the expectation with a sample average over games you actually play. That's <strong>REINFORCE</strong> (Williams, 1992) — the Monte-Carlo policy gradient.</p>
+
+  <pre><code><span class="c"># REINFORCE on Figgie self-play (one iteration)</span>
+<span class="k">for</span> iteration <span class="k">in</span> range(num_iters):
+    batch = []
+    <span class="k">for</span> g <span class="k">in</span> range(N):                       <span class="c"># play N self-play games</span>
+        traj = play_game(<span class="v">policy</span>, opponents=sample_pool())
+        batch.append(traj)
+
+    loss = <span class="n">0</span>
+    <span class="k">for</span> traj <span class="k">in</span> batch:
+        G = discounted_returns_to_go(traj.rewards, gamma)   <span class="c"># G_t for each step</span>
+        <span class="k">for</span> (s, a, G_t) <span class="k">in</span> zip(traj.states, traj.actions, G):
+            loss = loss - <span class="f">log_prob</span>(<span class="v">policy</span>, s, a) * G_t   <span class="c"># ascent ⇒ negate</span>
+    loss = loss / N
+    loss.<span class="f">backward</span>(); optimizer.<span class="f">step</span>()                  <span class="c"># θ ← θ + α·∇J</span></code></pre>
+
+  <h3>In practice: a surrogate loss, then a normal optimizer</h3>
+  <p>A natural question at this point: when you implement REINFORCE, do you compute the gradient \(\nabla_\theta J\) by hand and apply it, or do you have a loss function and a normal optimizer? <strong>Almost always the latter.</strong> You build a scalar "surrogate loss" whose automatic-differentiation gradient <em>equals</em> the policy gradient, then call <code>.backward()</code> and a standard <code>Adam</code>/<code>SGD</code> step. You essentially never compute \(\nabla\log\pi\) by hand.</p>
+
+  <p>The mechanism: <code>optimizer.step()</code> wants a scalar to differentiate, not a gradient. So construct the scalar whose derivative <em>is</em> the policy gradient. Because the return \(G_t\) is a constant (a number from the environment), the loss</p>
+  \[ L(\theta) = -\frac{1}{N}\sum_t \log\pi_\theta(a_t\mid s_t)\cdot G_t \qquad\Longrightarrow\qquad \nabla_\theta L = -\frac{1}{N}\sum_t \nabla_\theta\log\pi_\theta(a_t\mid s_t)\cdot G_t = -\,\widehat{\nabla_\theta J} \]
+  <p>has a gradient equal to the negated policy gradient. Minimising \(L\) with a normal optimizer therefore <em>ascends</em> \(J\) — the minus sign is only there because optimizers minimise.</p>
+
+  <pre><code><span class="c"># REINFORCE, the way it's actually written (PyTorch)</span>
+returns = discounted_returns_to_go(rewards, gamma)            <span class="c"># G_t — plain numbers</span>
+returns = (returns - returns.mean()) / (returns.std() + <span class="n">1e-8</span>)  <span class="c"># baseline / normalise</span>
+
+logits = <span class="v">policy</span>(states)                                  <span class="c"># fresh forward pass</span>
+dist   = Categorical(logits=logits)
+logp   = dist.<span class="f">log_prob</span>(actions)                          <span class="c"># log π_θ(a_t|s_t), differentiable</span>
+
+loss = -(logp * returns.<span class="f">detach</span>()).mean()              <span class="c"># the surrogate scalar</span>
+
+optimizer.<span class="f">zero_grad</span>()
+loss.<span class="f">backward</span>()        <span class="c"># autodiff produces the policy gradient</span>
+optimizer.<span class="f">step</span>()       <span class="c"># a completely normal Adam/SGD step</span></code></pre>
+
+  <div class="box pitfall">
+    <div class="lbl">⚠ Two things that trip everyone up</div>
+    <p><strong>1. The loss value is meaningless.</strong> This is <em>not</em> a supervised loss you drive toward zero. Its number, \(-\text{mean}(\log\pi\cdot G)\), drifts up, down, or sideways while training succeeds — only its <em>gradient</em> carries information. Don't watch <code>loss.item()</code> as a health signal; watch reward.</p>
+    <p style="margin-bottom:0"><strong>2. The weight must be <code>detach()</code>-ed.</strong> \(G_t\) (or, in actor–critic, the advantage) is a <em>coefficient</em>, not something to backprop through. Forget to detach a learned advantage and gradients leak into the critic, and the expression is no longer the policy gradient. This is exactly the <code>new_values.detach()</code> in your repo's <code>ppo_loss_batched</code> — and the same class of mistake as the entropy-detach bug in the project notes.</p>
+  </div>
+
+  <div class="box intuition">
+    <div class="lbl">💡 Why not just code the gradient directly?</div>
+    <p style="margin-bottom:0">You could — \(\nabla_\theta\log\pi\) for a softmax has the closed form \(\text{onehot}(a)-\text{softmax}(\text{logits})\), and people did this before autodiff. But for a Transformer policy with millions of weights it is hopeless by hand. Autodiff computes it for free the instant you write <code>log_prob(a)</code> as a differentiable function of \(\theta\). So the universal pattern — and precisely what FiggieRL does — is <strong>build a surrogate scalar loss → <code>.backward()</code> → normal optimizer step</strong>. PPO and GRPO are the same pattern; they only swap \(G_t\) for a clipped, advantage-weighted term. That is why <code>ppo_loss_batched</code> returns a <code>loss</code> that flows straight into <code>loss.backward()</code> and the Muon/Adam step, with no manual gradients anywhere.</p>
+  </div>
+
+  <p>It is unbiased and it works — but the gradient estimate has <strong>brutally high variance</strong>, and on Figgie this is fatal without help. Two compounding reasons:</p>
+  <ul>
+    <li><strong>Sparse, noisy returns.</strong> The score only materialises at the end and swings ±\$100 on the luck of the deal. The same opening action precedes wildly different returns across games.</li>
+    <li><strong>Bad credit assignment.</strong> Every action in a winning game is reinforced equally, including the mistakes. You need hundreds of games to average out which actions <em>actually</em> mattered.</li>
+  </ul>
+
+  <h3>Baselines: the single most important variance trick</h3>
+  <p>Here is the lever the rest of the field pulls. Subtract a <em class="term">baseline</em> \(b(s_t)\) — any function of state, <em>not</em> of the action — from the return:</p>
+  \[ \nabla_\theta J(\theta) = \mathbb{E}\!\Big[\textstyle\sum_t \nabla_\theta\log\pi_\theta(a_t\mid s_t)\,\big(G_t - b(s_t)\big)\Big]. \]
+  <p>This changes the <em>variance</em> but <strong>not the expectation</strong>: the estimator stays unbiased for <em>any</em> such \(b\). That freedom is a gift.</p>
+
+  <details>
+    <summary>Why subtracting a baseline keeps the estimator unbiased</summary>
+    <div class="inner">
+      <p>It suffices to show the extra term has zero mean. For a fixed state \(s\), summing the score over actions against a state-only baseline:</p>
+      \[ \mathbb{E}_{a\sim\pi_\theta}\!\big[\nabla_\theta\log\pi_\theta(a\mid s)\,b(s)\big] = b(s)\sum_a \pi_\theta(a\mid s)\,\nabla_\theta\log\pi_\theta(a\mid s) = b(s)\sum_a \nabla_\theta \pi_\theta(a\mid s). \]
+      <p>Because probabilities sum to one for every \(\theta\), \(\sum_a \pi_\theta(a\mid s)=1\Rightarrow \nabla_\theta\sum_a \pi_\theta(a\mid s)=\nabla_\theta 1 = 0\). So the whole term vanishes in expectation. We subtracted noise for free.</p>
+    </div>
+  </details>
+
+  <p>What is the <em>best</em> baseline? Intuitively, the average return you expect from state \(s\) — i.e. the <strong>value function</strong> \(V^\pi(s)\). Then the weight on each action becomes</p>
+  \[ G_t - V^\pi(s_t) \;\approx\; Q^\pi(s_t,a_t) - V^\pi(s_t) \;=\; A^\pi(s_t,a_t), \]
+  <p>the <em class="term">advantage</em>: <strong>how much better than average was this action?</strong> A heart bid that returns +\$40 in a game where the seat <em>expected</em> +\$45 has <em>negative</em> advantage — correctly, you'd rather have done something else. Raw REINFORCE would have reinforced it.</p>
+
+  <div class="box key">
+    <div class="lbl">✦ Take-away</div>
+    <p style="margin-bottom:0">Policy gradient with the value baseline reinforces actions by their <strong>advantage</strong> \(A^\pi(s,a)\), not their raw return. We don't know \(V^\pi\), so the obvious move is to <em>learn it</em> alongside the policy. That second network is the <strong>critic</strong> — and it takes us to Actor–Critic.</p>
+  </div>
+</section>
+
+<!-- ════════════ 5. ACTOR-CRITIC ════════════ -->
+<section id="ac" class="major">
+  <div class="h2num">SECTION 5</div>
+  <h2>Actor–Critic &amp; advantage estimation</h2>
+
+  <p>An <strong>actor–critic</strong> runs two estimators that help each other:</p>
+  <ul>
+    <li>the <strong>actor</strong> \(\pi_\theta(a\mid s)\) — the policy we ultimately want;</li>
+    <li>the <strong>critic</strong> \(V_\phi(s)\) — a learned value function used as the baseline, so the actor can be scored by advantage instead of raw return.</li>
+  </ul>
+
+  <div class="box figgie">
+    <div class="lbl">🃏 In FiggieRL these share a body</div>
+    <p>The <code>FiggieTransformer</code> has <em>two heads</em> on the same trunk: a policy head emitting 146 logits and a scalar value head. The rollout records the value head's output as <code>old_values</code>; the loss uses it as the baseline. One network, one forward pass, two jobs — cheap and the representation is shared.</p>
+  </div>
+
+  <h3>The bias–variance dial</h3>
+  <p>How should the critic estimate the advantage? Two extremes:</p>
+  <table>
+    <tr><th>Estimator</th><th>Advantage of \((s_t,a_t)\)</th><th>Bias</th><th>Variance</th></tr>
+    <tr><td><strong>Monte-Carlo</strong> (REINFORCE-style)</td><td>\(G_t - V_\phi(s_t)\), full return-to-go</td><td>none</td><td>very high</td></tr>
+    <tr><td><strong>One-step TD</strong> (bootstrapped)</td><td>\(\delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t)\)</td><td>high (relies on \(V_\phi\))</td><td>low</td></tr>
+  </table>
+  <p>MC waits for the true outcome — unbiased but hostage to end-game luck. TD trusts the critic's guess of the future after one real step — low variance but biased while \(V_\phi\) is wrong. The TD error \(\delta_t\) is itself a one-sample advantage estimate.</p>
+
+  <h3>GAE: a tunable interpolation</h3>
+  <p><strong>Generalised Advantage Estimation</strong> (Schulman et al., 2016) blends the whole spectrum with one knob \(\lambda\in[0,1]\): an exponentially-weighted sum of future TD errors.</p>
+  \[ \hat A_t^{\text{GAE}(\gamma,\lambda)} \;=\; \sum_{l=0}^{\infty} (\gamma\lambda)^l\,\delta_{t+l}, \qquad \delta_t = r_t + \gamma V_\phi(s_{t+1}) - V_\phi(s_t). \]
+  <ul>
+    <li>\(\lambda=0\): collapses to one-step TD \(\hat A_t=\delta_t\) — low variance, biased.</li>
+    <li>\(\lambda=1\): telescopes to the MC advantage \(G_t - V_\phi(s_t)\) — unbiased, high variance.</li>
+    <li>\(0&lt;\lambda&lt;1\): dials in between. FiggieRL uses \(\gamma=0.99,\ \lambda=0.95\) — mostly trusting real reward, a touch of bootstrapping to tame the sparse end-loaded signal.</li>
+  </ul>
+
+  <details>
+    <summary>How that exact GAE recurrence appears in <code>run_batched_rollouts</code></summary>
+    <div class="inner">
+      <p>The sum is computed in closed form by a reverse cumulative sum over the time axis. From <code>figgie/train.py</code>:</p>
+      <pre><code>next_vals = cat([old_values[:, <span class="n">1</span>:], zeros(B, <span class="n">1</span>)], dim=<span class="n">1</span>)
+deltas    = step_rewards + gae_gamma * next_vals - old_values   <span class="c"># δ_t</span>
+gl        = gae_gamma * gae_lambda                              <span class="c"># γλ</span>
+decay     = gl ** arange(T)                                     <span class="c"># (γλ)^t</span>
+gae       = (deltas * decay).flip(<span class="n">1</span>).cumsum(<span class="n">1</span>).flip(<span class="n">1</span>) / decay   <span class="c"># Â_t</span>
+returns   = gae + old_values                                   <span class="c"># value target</span></code></pre>
+      <p>The <code>flip → cumsum → flip</code> is the standard trick for "sum of everything from \(t\) onward". <code>returns = Â + V</code> recovers the bootstrapped \(\lambda\)-return used as the critic's regression target. Same formula, vectorised across a whole batch of games with no Python loop.</p>
+    </div>
+  </details>
+
+  <figure>
+    <svg viewBox="0 0 640 250" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+      <rect x="60" y="40" width="200" height="74" rx="10" fill="#eef3ff" stroke="#cdd9fb"/>
+      <text x="160" y="70" text-anchor="middle" font-size="15" font-weight="700" fill="#3b5bdb">ACTOR  π_θ(a|s)</text>
+      <text x="160" y="92" text-anchor="middle" font-size="12" fill="#4a4f57">picks the trade</text>
+      <rect x="380" y="40" width="200" height="74" rx="10" fill="#ecfaef" stroke="#bfe6c8"/>
+      <text x="480" y="70" text-anchor="middle" font-size="15" font-weight="700" fill="#2b8a3e">CRITIC  V_φ(s)</text>
+      <text x="480" y="92" text-anchor="middle" font-size="12" fill="#4a4f57">scores the state</text>
+      <rect x="220" y="175" width="200" height="50" rx="10" fill="#fff8e8" stroke="#f0e0b0"/>
+      <text x="320" y="198" text-anchor="middle" font-size="13" font-weight="700" fill="#b8860b">FIGGIE GAME</text>
+      <text x="320" y="215" text-anchor="middle" font-size="11" fill="#4a4f57">reward = chip delta</text>
+      <!-- arrows -->
+      <defs><marker id="ar" markerWidth="9" markerHeight="9" refX="7" refY="3" orient="auto"><path d="M0,0 L7,3 L0,6 Z" fill="#8b9099"/></marker></defs>
+      <path d="M160,114 C160,150 230,165 250,175" fill="none" stroke="#8b9099" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M390,210 C440,200 470,150 480,114" fill="none" stroke="#8b9099" stroke-width="1.6" marker-end="url(#ar)"/>
+      <path d="M380,77 L260,77" fill="none" stroke="#8b9099" stroke-width="1.6" marker-end="url(#ar)"/>
+      <text x="320" y="70" text-anchor="middle" font-size="11" fill="#8b9099">advantage Â = r+γV′−V</text>
+    </svg>
+    <figcaption>The actor acts; the game returns reward; the critic turns reward into a low-variance advantage that tells the actor not just "good/bad" but "<em>better or worse than expected</em>." PPO and GRPO are both refinements of <em>how the actor consumes that advantage</em>.</figcaption>
+  </figure>
+
+  <p>So far so good — but vanilla actor–critic has a dangerous habit: it takes one gradient step per batch of data, and if you make that step too big, or reuse data, the policy can <strong>collapse</strong>. That is the problem PPO was designed to solve.</p>
+</section>
+
+<!-- ════════════ 6. PPO ════════════ -->
+<section id="ppo" class="major">
+  <div class="h2num">SECTION 6 · KEY ALGORITHM</div>
+  <h2>Proximal Policy Optimization (PPO)</h2>
+
+  <p>PPO (Schulman et al., 2017) is the workhorse of modern policy-gradient RL — and the algorithm FiggieRL actually trains with. It exists to answer one practical question: <strong>given a batch of self-play games, how do I extract as much improvement as possible without taking a step so large it destroys the policy?</strong></p>
+
+  <h3>The problem PPO fixes</h3>
+  <p>Plain policy gradient is sample-inefficient: collect a batch, take <em>one</em> tiny step, throw the batch away. Rollouts are expensive (each is a full Figgie game), so we'd love to take <em>several</em> gradient steps on the same batch. But the moment \(\theta\) moves, the batch was generated by the <em>old</em> policy \(\pi_{\theta_\text{old}}\), not the current one — the data is off-policy. Push too far and the estimate becomes meaningless; the policy can lurch into garbage and never recover.</p>
+
+  <h3>Step 1 — Importance sampling makes data reusable</h3>
+  <p>The thing we actually want to push up is the advantage-weighted objective <em>under the current policy</em>, \(\mathbb{E}_{a_t\sim\pi_\theta}[\hat A_t]\). But during PPO's multiple update epochs every sample we hold was generated by the <strong>old</strong> policy \(\pi_{\theta_\text{old}}\) — we ran those Figgie games once and froze the batch. We have draws from \(\pi_{\theta_\text{old}}\), not from \(\pi_\theta\), so we cannot evaluate that expectation directly. <em class="term">Importance sampling</em> is the standard fix: estimate an expectation under one distribution using samples from another.</p>
+
+  <p>The identity, for any \(p,q,f\), is to reweight each sample from \(q\) by the likelihood ratio \(p/q\):</p>
+  \[ \mathbb{E}_{x\sim p}\big[f(x)\big] \;=\; \mathbb{E}_{x\sim q}\!\Big[\tfrac{p(x)}{q(x)}\,f(x)\Big]. \]
+  <p>Apply it with \(p=\pi_\theta\) (what we want) and \(q=\pi_{\theta_\text{old}}\) (what we sampled from). The likelihood ratio becomes the <em class="term">probability ratio</em> \(r_t(\theta)\), and the reweighted objective is the <strong>importance-sampling surrogate</strong> \(L^{\text{IS}}\):</p>
+
+  <div class="box key">
+    <div class="lbl">✦ The IS surrogate objective</div>
+    \[ r_t(\theta) = \frac{\pi_\theta(a_t\mid s_t)}{\pi_{\theta_\text{old}}(a_t\mid s_t)}, \qquad \underbrace{L^{\text{IS}}(\theta)}_{\text{objective to }\textbf{maximize}} = \mathbb{E}_{a_t\sim\pi_{\theta_\text{old}}}\!\big[\,r_t(\theta)\,\hat A_t\,\big] \;=\; \mathbb{E}_{a_t\sim\pi_\theta}\big[\hat A_t\big]. \]
+    <p style="margin-bottom:0">In words: \(L^{\text{IS}}(\theta)\) is our best estimate, computed purely from the <em>old</em> rollout, of how good the <em>new</em> policy would be. Each stored sample's advantage \(\hat A_t\) is rescaled by how much more (\(r_t&gt;1\)) or less (\(r_t&lt;1\)) likely \(\pi_\theta\) is to have taken that action. "IS" = importance sampling; it is a quantity we climb, not a loss we minimise.</p>
+  </div>
+
+  <p>Two facts make this the <em>right</em> surrogate to optimise — not just a convenient guess:</p>
+  <ul>
+    <li><strong>It's exact at the start.</strong> At \(\theta=\theta_\text{old}\) every ratio \(r_t=1\), so \(L^{\text{IS}}=\mathbb{E}[\hat A_t]\) with no distortion. If the new policy makes \(a_t\) twice as likely, \(r_t=2\) and that sample counts double; half as likely, it counts half.</li>
+    <li><strong>Its gradient is the policy gradient.</strong> Since \(\nabla_\theta r_t = r_t\,\nabla_\theta\log\pi_\theta\), at \(r_t=1\) we get \(\nabla_\theta L^{\text{IS}} = \mathbb{E}[\nabla_\theta\log\pi_\theta\,\hat A_t]\) — exactly the policy gradient theorem of §3. Stepping uphill on \(L^{\text{IS}}\) is, to first order, stepping uphill on real expected chips, but using <em>reusable</em> off-policy data.</li>
+  </ul>
+
+  <div class="box intuition">
+    <div class="lbl">💡 "Wait — isn't the objective \(\hat A\cdot\log\pi\)?"</div>
+    <p>A natural objection: in §4 the thing we worked with was \(\hat A\cdot\log\pi(a\mid s)\), so why is \(L^{\text{IS}}\) built from \(r_t\,\hat A\) with no \(\log\pi\) in sight? Because those are <strong>two different objects</strong> that are easy to merge:</p>
+    <table style="margin:14px 0;">
+      <tr><th>Expression</th><th>What it is</th><th>Its <em>value</em></th><th>Its <em>gradient</em></th></tr>
+      <tr><td>\(\;J=\mathbb{E}[\hat A]\;\)</td><td>the <strong>objective</strong> (expected chips)</td><td>meaningful</td><td>\(\mathbb{E}[\nabla\log\pi\,\hat A]\)</td></tr>
+      <tr><td>\(\;\mathbb{E}[\log\pi\cdot\hat A]\;\) <span style="font-size:11px;color:var(--ink-faint)">(\(\hat A\) detached)</span></td><td>the REINFORCE <strong>surrogate loss</strong></td><td><strong>meaningless</strong></td><td>\(\mathbb{E}[\nabla\log\pi\,\hat A]\) — identical</td></tr>
+    </table>
+    <p>The \(\hat A\cdot\log\pi\) you remember was never the objective; it was the <em>surrogate loss</em> — an expression engineered so autodiff spits out \(\nabla J\) (exactly the "its value is meaningless, only its gradient matters" box back in §4). The real objective has always been the plain expected advantage \(\mathbb{E}[\hat A]\), and <strong>\(L^{\text{IS}}=\mathbb{E}[r_t\,\hat A]\) is just that same objective rewritten with importance sampling</strong> — not a new surrogate loss.</p>
+    <p><strong>So why \(r_t\,\hat A\) and not \(\log\pi\cdot\hat A\) as the thing to climb over several steps?</strong></p>
+    <ul style="margin-top:6px;">
+      <li>\(\log\pi\cdot\hat A\) only has the correct gradient <em>at</em> \(\theta_\text{old}\). It's one-shot: its <em>value</em> doesn't track the updated policy at all, so after a single step it's stale and there's nothing meaningful left to maximise.</li>
+      <li>\(r_t\,\hat A\) stays an honest, evaluable estimate of the new policy's performance for <em>any</em> \(\theta\), because \(r_t=\pi_\theta/\pi_{\theta_\text{old}}\) keeps tracking how far \(\pi_\theta\) has drifted. That is precisely what lets PPO take <em>several</em> gradient steps on one frozen batch — the whole reason the algorithm exists.</li>
+    </ul>
+    <p style="margin-bottom:0">And they're consistent: from \(\nabla r_t = r_t\,\nabla\log\pi\) and \(r_t=1\) at \(\theta_\text{old}\), both forms share the <em>same gradient</em> at the current policy. They differ only <em>away</em> from \(\theta_\text{old}\) — where \(r_t\,\hat A\) stays meaningful and \(\log\pi\cdot\hat A\) does not.</p>
+  </div>
+
+  <p><strong>The catch — and the entire reason PPO exists.</strong> Importance sampling is only trustworthy while \(\pi_\theta\) and \(\pi_{\theta_\text{old}}\) stay close. As \(r_t\) wanders far from 1, the estimator's <em>variance explodes</em>, and \(L^{\text{IS}}\) starts handing out big rewards for dumping probability mass onto whichever action has the <em>noisiest</em> advantage estimate rather than the genuinely best one — so maximising it blindly can lurch the policy into garbage. We need a leash on \(r_t\).</p>
+
+  <h3>Step 2 — The clipped surrogate objective</h3>
+  <p>TRPO leashed it with a hard KL-divergence constraint and second-order optimisation. PPO's insight is that you can get the same "don't move too far" effect with a <em>brutally simple</em> first-order trick: <strong>clip the ratio</strong> so the objective stops rewarding you once you've moved far enough.</p>
+
+  <div class="box key">
+    <div class="lbl">✦ PPO clipped objective</div>
+    \[ L^{\text{CLIP}}(\theta) = \mathbb{E}_t\Big[\,\min\big(\,r_t(\theta)\,\hat A_t,\;\; \operatorname{clip}(r_t(\theta),\,1-\epsilon,\,1+\epsilon)\,\hat A_t\,\big)\Big]. \]
+    <p style="margin-bottom:0">FiggieRL uses \(\epsilon=0.2\) (<code>ppo_clip_eps</code>). The <code>min</code> of the unclipped and clipped terms makes the bound <strong>pessimistic</strong> — it always takes the more conservative of the two.</p>
+  </div>
+
+  <h4>Reading the clip, case by case</h4>
+  <p>This is the heart of PPO; it's worth getting it in your bones. Consider one sample.</p>
+  <ul>
+    <li><strong>Advantage positive (\(\hat A_t&gt;0\)) — a good action.</strong> We want to raise its probability, so \(r_t\) climbs above 1. The objective increases <em>until</em> \(r_t=1+\epsilon\); past that the clipped term flattens it. <strong>No reward for pushing a good action's probability up more than ~20%.</strong> The gradient there is zero — the incentive to keep moving dies.</li>
+    <li><strong>Advantage negative (\(\hat A_t&lt;0\)) — a bad action.</strong> We want to lower its probability, so \(r_t\) drops below 1. The objective improves until \(r_t=1-\epsilon\), then flattens. <strong>No reward for crushing a bad action below ~−20% in one update.</strong></li>
+    <li>The asymmetric <code>min</code> has a subtle, important role: if a step <em>overshoots</em> (a positive-advantage action's ratio somehow lands below 1, or vice-versa), the unclipped term is selected and the full gradient pulls it <em>back</em>. The clip caps gains but never caps corrections.</li>
+  </ul>
+
+  <figure>
+    <svg viewBox="0 0 660 270" xmlns="http://www.w3.org/2000/svg" font-family="Inter, sans-serif">
+      <!-- left: A>0 -->
+      <g transform="translate(40,20)">
+        <text x="130" y="0" text-anchor="middle" font-size="13" font-weight="700" fill="#2b8a3e">Â &gt; 0  (good action)</text>
+        <line x1="0" y1="200" x2="260" y2="200" stroke="#aaa" stroke-width="1"/>
+        <line x1="0" y1="200" x2="0" y2="20" stroke="#aaa" stroke-width="1"/>
+        <!-- r axis ticks: r=1 at x=130, 1-e at 80, 1+e at 180 -->
+        <line x1="80" y1="200" x2="80" y2="205" stroke="#aaa"/><text x="80" y="222" text-anchor="middle" font-size="10" fill="#888">1−ε</text>
+        <line x1="130" y1="200" x2="130" y2="205" stroke="#aaa"/><text x="130" y="222" text-anchor="middle" font-size="10" fill="#888">1</text>
+        <line x1="180" y1="200" x2="180" y2="205" stroke="#aaa"/><text x="180" y="222" text-anchor="middle" font-size="10" fill="#888">1+ε</text>
+        <text x="252" y="222" font-size="10" fill="#888">r(θ)</text>
+        <!-- L = min: rises with slope then flat after 1+e -->
+        <path d="M10,165 L180,55 L260,55" fill="none" stroke="#2b8a3e" stroke-width="3"/>
+        <circle cx="180" cy="55" r="3.5" fill="#2b8a3e"/>
+        <text x="200" y="48" font-size="10" fill="#2b8a3e">clipped flat</text>
+      </g>
+      <!-- right: A<0 -->
+      <g transform="translate(370,20)">
+        <text x="130" y="0" text-anchor="middle" font-size="13" font-weight="700" fill="#c92a2a">Â &lt; 0  (bad action)</text>
+        <line x1="0" y1="40" x2="260" y2="40" stroke="#aaa" stroke-width="1"/>
+        <line x1="0" y1="40" x2="0" y2="220" stroke="#aaa" stroke-width="1"/>
+        <line x1="80" y1="40" x2="80" y2="35" stroke="#aaa"/><text x="80" y="28" text-anchor="middle" font-size="10" fill="#888">1−ε</text>
+        <line x1="130" y1="40" x2="130" y2="35" stroke="#aaa"/><text x="130" y="28" text-anchor="middle" font-size="10" fill="#888">1</text>
+        <line x1="180" y1="40" x2="180" y2="35" stroke="#aaa"/><text x="180" y="28" text-anchor="middle" font-size="10" fill="#888">1+ε</text>
+        <text x="252" y="28" font-size="10" fill="#888">r(θ)</text>
+        <!-- L flat until 1-e then decreasing -->
+        <path d="M10,75 L80,75 L250,185" fill="none" stroke="#c92a2a" stroke-width="3"/>
+        <circle cx="80" cy="75" r="3.5" fill="#c92a2a"/>
+        <text x="10" y="66" font-size="10" fill="#c92a2a">clipped flat</text>
+      </g>
+    </svg>
+    <figcaption>The clipped objective \(L^{\text{CLIP}}\) as a function of the ratio \(r_t(\theta)\). For a good action (left) the incentive to increase its probability switches off past \(1+\epsilon\); for a bad action (right) the incentive to decrease it switches off past \(1-\epsilon\). The flat regions have zero gradient — PPO simply stops pulling once a single update has moved far enough. This is the "trust region," enforced by a one-line clamp instead of TRPO's constrained optimisation.</figcaption>
+  </figure>
+
+  <h3>Step 3 — The full PPO loss</h3>
+  <p>The actual training loss adds the critic's regression and an entropy bonus:</p>
+  \[ L(\theta,\phi) \;=\; \underbrace{-\,L^{\text{CLIP}}(\theta)}_{\text{policy (actor)}} \;+\; \underbrace{c_v\, \mathbb{E}_t\big[(V_\phi(s_t)-\hat R_t)^2\big]}_{\text{value (critic)}} \;-\; \underbrace{c_e\,\mathbb{E}_t\big[\mathcal H[\pi_\theta(\cdot\mid s_t)]\big]}_{\text{entropy bonus}}. \]
+  <ul>
+    <li><strong>Value loss</strong> regresses the critic onto the GAE \(\lambda\)-returns \(\hat R_t\). FiggieRL: <code>vf_coef = 0.5</code>.</li>
+    <li><strong>Entropy bonus</strong> rewards a less peaked policy, sustaining exploration and — crucially in an adversarial game — keeping the policy <em>mixed</em> and hard to exploit. FiggieRL: <code>entropy_coef = 0.03</code>. <span class="pill repo">project note</span> An earlier bug detached entropy from the graph and the policy collapsed to near-deterministic overconfidence; the coefficient and a correct gradient path are what hold it open.</li>
+  </ul>
+
+  <h3>The PPO training loop, FiggieRL-style</h3>
+  <pre><code><span class="k">for</span> iteration <span class="k">in</span> range(num_iters):
+    <span class="c"># ── 1. COLLECT: run a big batch of self-play games on GPU ──</span>
+    opps = sample_pool(experts + snapshots)
+    exp  = run_batched_rollouts(model, opps, num_games=<span class="n">1024</span>, G=<span class="n">8</span>,
+                                gae_gamma=<span class="n">0.99</span>, gae_lambda=<span class="n">0.95</span>)
+    <span class="c"># records: old_log_probs, old_values, returns (GAE), valid_masks …</span>
+
+    <span class="c"># ── 2. OPTIMISE: several epochs of minibatch updates on the SAME batch ──</span>
+    <span class="k">for</span> step <span class="k">in</span> range(train_steps):          <span class="c"># reuse the rollout ~epochs times</span>
+        mb = sample_minibatch(exp, minibatch_size=<span class="n">256</span>)
+        logits, new_values = model(mb.tokens)        <span class="c"># fresh forward pass</span>
+        ratio = exp((new_lp - mb.old_log_probs))     <span class="c"># r_t(θ)</span>
+        adv   = normalize(mb.returns - new_values.detach())
+        surr1 = ratio * adv
+        surr2 = clamp(ratio, <span class="n">1</span>-<span class="n">0.2</span>, <span class="n">1</span>+<span class="n">0.2</span>) * adv
+        pg    = -min(surr1, surr2).mean()            <span class="c"># clipped policy loss</span>
+        vf    = (new_values - mb.returns).pow(<span class="n">2</span>).mean()
+        ent   = entropy(logits).mean()
+        loss  = pg + <span class="n">0.5</span>*vf - <span class="n">0.03</span>*ent
+        loss.<span class="f">backward</span>(); clip_grad(<span class="n">1.0</span>); muon_adam_step()
+
+    <span class="k">if</span> iteration % snapshot_every == <span class="n">0</span>:
+        pool.<span class="f">add</span>(freeze(model))                       <span class="c"># self-play opponent</span></code></pre>
+
+  <details>
+    <summary>How this maps to <code>ppo_loss_batched</code> in the repo (the real details)</summary>
+    <div class="inner">
+      <p>A few choices in <code>figgie/train.py</code> worth flagging, because they differ from the textbook sketch:</p>
+      <ul>
+        <li><strong>Action masking everywhere.</strong> Both at rollout and in the loss, illegal-action logits are set to \(-\infty\) before <code>log_softmax</code>, so probability mass and entropy are computed over <em>legal</em> actions only.</li>
+        <li><strong>Only the model's own steps count.</strong> A game's token stream interleaves all four seats; <code>model_acts</code> masks the loss/entropy/advantage to the steps the <em>learner</em> actually chose. Opponent moves are context, not training signal.</li>
+        <li><strong>Returns are normalised across the minibatch</strong> (<code>R_norm = (returns − mean)/std</code>) before forming the advantage, and the advantage is normalised again. Whitening keeps the gradient scale stable across iterations regardless of the pot's raw chip magnitude.</li>
+        <li><strong>Advantage uses the live critic:</strong> <code>adv = R_norm − new_values.detach()</code>. The <code>detach</code> stops advantage gradients from leaking into the value head — the critic is trained <em>only</em> by the value loss, the actor <em>only</em> by the policy loss.</li>
+        <li><strong>Optimiser:</strong> <code>Muon</code> (Newton–Schulz-orthogonalised momentum) on 2-D weight matrices, AdamW on the rest, gradient-clipped at 1.0.</li>
+      </ul>
+    </div>
+  </details>
+
+  <div class="box pitfall">
+    <div class="lbl">⚠ Diagnostics that tell you PPO is healthy</div>
+    <p>The loss records <code>clip_frac</code> (fraction of samples hitting the clip — want a modest, non-zero value; near-1 means the step or learning rate is too hot), <code>explained_var</code> (is the critic actually predicting returns? near 0 or negative means a useless baseline → variance back to REINFORCE levels), <code>ratio_mean</code> (should hover near 1), and <code>avg_max_prob</code> (creeping toward 1.0 = the overconfidence collapse the entropy bonus exists to prevent). Watch these, not just reward.</p>
+  </div>
+
+  <div class="box intuition">
+    <div class="lbl">💡 PPO in one sentence</div>
+    <p style="margin-bottom:0">Collect self-play games once, then squeeze several safe gradient steps out of them by reweighting with the probability ratio and <em>clipping that ratio so no single update can move the policy more than ~20%</em> — turning the expensive, fragile policy gradient into a cheap, stable, reusable one.</p>
+  </div>
+</section>
+
+<!-- ════════════ 7. GRPO ════════════ -->
+<section id="grpo" class="major">
+  <div class="h2num">SECTION 7 · KEY ALGORITHM</div>
+  <h2>Group Relative Policy Optimization (GRPO)</h2>
+
+  <p>GRPO (DeepSeek, 2024) keeps PPO's clipped surrogate but <strong>throws the critic away</strong>. It was designed for RLHF on language models, where training a good value head is hard — but its core idea is a perfect fit for a <em>competitive, relative-reward game like Figgie</em>, and the <span class="pill repo">figgie/</span> config already carries its central knob: <code>group_size G = 8</code>.</p>
+
+  <h3>The idea: let a <em>group</em> be its own baseline</h3>
+  <p>Recall the baseline's only job (§4) is to answer "compared to what?" — to convert a raw return into "better or worse than expected." PPO learns a critic \(V_\phi(s)\) to supply that "expected." GRPO's move is almost cheeky: instead of <em>learning</em> the expected value of a situation, <strong>sample the situation many times and use the group's own average as the baseline.</strong></p>
+
+  <p>For a given starting situation, draw a <em class="term">group</em> of \(G\) trajectories \(\{o_1,\dots,o_G\}\) from the current policy, score each by its return \(R_i\), and define a <strong>group-relative advantage</strong> by standardising within the group:</p>
+  \[ \hat A_i \;=\; \frac{R_i - \operatorname{mean}(R_1,\dots,R_G)}{\operatorname{std}(R_1,\dots,R_G)}. \]
+  <p>That's the whole baseline. No value network, no GAE, no bootstrapping. An action sequence that beat its group's average gets positive advantage; one that lagged gets negative. Then plug \(\hat A_i\) into the <em>exact same clipped surrogate as PPO</em>.</p>
+
+  <div class="box key">
+    <div class="lbl">✦ GRPO objective</div>
+    \[ L^{\text{GRPO}}(\theta) = \mathbb{E}\Big[\, \min\big(r_i(\theta)\hat A_i,\ \operatorname{clip}(r_i(\theta),1-\epsilon,1+\epsilon)\hat A_i\big) \;-\; \beta\, D_{\text{KL}}\!\big(\pi_\theta \,\|\, \pi_{\text{ref}}\big)\Big] \]
+    <p>with the group-standardised \(\hat A_i\) above. Two structural differences from PPO: (1) <strong>no \(c_v\) value-loss term</strong> — there is no critic to train; (2) the KL to a fixed <strong>reference policy</strong> is often added <em>directly to the loss</em> as a penalty (rather than only implied by clipping), estimated with the unbiased low-variance estimator \(D_{\text{KL}}\approx \tfrac{\pi_{\text{ref}}}{\pi_\theta}-\log\tfrac{\pi_{\text{ref}}}{\pi_\theta}-1\).</p>
+  </div>
+
+  <h3>Why this is uncannily natural for Figgie</h3>
+  <p>In language-model RLHF, the "group" is \(G\) different answers sampled for the <em>same prompt</em>, and the relative advantage says "which answers were better than the others for this prompt." Translate to Figgie:</p>
+
+  <div class="box figgie">
+    <div class="lbl">🃏 A group = the same deal, played out G times</div>
+    <p>Deal one Figgie hand, then have the policy play that situation forward \(G=8\) times (different sampled actions, and — in FiggieRL's batched rollout — rotated through the four seats so each group covers the table symmetrically). You get eight final chip counts. <strong>Subtract the group mean</strong>: now "+\$30 in a deal where the group averaged +\$50" is correctly a <em>below-average</em> outcome, even though it's a profit. The luck of <em>which goal suit was dealt</em> is largely shared across the group, so subtracting the group mean <strong>cancels the deal's variance</strong> and isolates the part of the outcome due to <em>skill of play</em>. That is exactly the signal you want — and Figgie's reward is already a relative, zero-sum-ish quantity, so a relative baseline is arguably <em>more honest</em> than an absolute learned \(V_\phi\).</p>
+  </div>
+
+  <h3>PPO vs. GRPO, head to head</h3>
+  <table>
+    <tr><th></th><th>PPO</th><th>GRPO</th></tr>
+    <tr><td><strong>Baseline / "compared to what?"</strong></td><td>learned critic \(V_\phi(s)\)</td><td>mean return of the \(G\)-sample group</td></tr>
+    <tr><td><strong>Advantage</strong></td><td>GAE over per-step rewards</td><td>group-standardised final return \((R_i-\bar R)/\sigma\)</td></tr>
+    <tr><td><strong>Extra network</strong></td><td>yes — value head (≈ doubles value-side compute)</td><td>none</td></tr>
+    <tr><td><strong>Credit assignment</strong></td><td>per-step (fine-grained, via \(\delta_t\))</td><td>whole-trajectory (coarse, outcome-level)*</td></tr>
+    <tr><td><strong>Cost</strong></td><td>critic must be trained well or variance explodes</td><td>need \(G\) rollouts per situation; std can be unstable if a group is near-uniform</td></tr>
+    <tr><td><strong>Shines when…</strong></td><td>dense/shaped rewards; a good value fn is learnable</td><td>sparse <em>outcome</em> rewards; competitive/relative payoffs (Figgie, LLM preference)</td></tr>
+  </table>
+  <p style="font-size:14px;color:var(--ink-faint);">*In GRPO every action in a trajectory shares that trajectory's single advantage \(\hat A_i\) — "outcome supervision." Variants compute per-step ("process") advantages, regaining some of PPO's granularity.</p>
+
+  <div class="box intuition">
+    <div class="lbl">💡 The unifying picture</div>
+    <p>PPO, A2C and GRPO are the <em>same</em> clipped policy-gradient skeleton with different <strong>advantage estimators</strong> bolted on. A2C: one-step TD. PPO: GAE off a learned critic. GRPO: standardise within a group of siblings. Once you see "it's all about how you compute \(\hat A_t\) and how hard you clip \(r_t\)," every one of these algorithms becomes a two-line variation on the policy gradient theorem from §3.</p>
+  </div>
+
+  <details>
+    <summary>FiggieRL is a hybrid — and seeing why is instructive</summary>
+    <div class="inner">
+      <p>The repo isn't dogmatically one or the other. It keeps a <strong>value head and GAE</strong> (PPO-style fine-grained credit assignment across the ~100 trading decisions in a game) <em>and</em> carries <code>group_size = 8</code> with seat-rotated groups (GRPO-style structure that cancels deal luck), normalising returns across the batch. That's a deliberate engineering choice: per-step credit matters in Figgie because a single mispriced quote 80 steps before the end genuinely is a localised mistake — pure outcome-level GRPO would smear blame across the whole game. The group structure is layered on top to kill the dominant variance source (the deal). Understanding both algorithms is what lets you read that design as the considered compromise it is, rather than a muddle.</p>
+    </div>
+  </details>
+</section>
+
+<!-- ════════════ 8. CFR ════════════ -->
+<section id="cfr" class="major">
+  <div class="h2num">SECTION 8 · KEY ALGORITHM</div>
+  <h2>Counterfactual Regret Minimization (CFR)</h2>
+
+  <p>PPO and GRPO are <em>gradient</em> methods: they nudge a policy uphill and hope. They have no built-in notion that Figgie is a game of <strong>hidden information against adversaries</strong>, and nothing guarantees they converge to an unexploitable strategy — left alone, two self-playing PPO agents can chase each other in circles. CFR comes from a different lineage — <strong>game theory</strong> — and was the engine behind superhuman poker (Libratus, Pluribus). It is built from the ground up for exactly Figgie's defining feature: imperfect information. This section is the conceptual payoff; it requires a small shift in formalism.</p>
+
+  <h3>New formalism: extensive-form games and information sets</h3>
+  <p>Drop the MDP picture; adopt the <em class="term">extensive-form game</em> (a game tree). The key new object is the <em class="term">information set</em> \(I\): the set of game states (tree nodes) that a player <strong>cannot tell apart</strong> from what they've observed.</p>
+
+  <div class="box figgie">
+    <div class="lbl">🃏 An information set in Figgie</div>
+    <p>You hold {3♥, 2♦, …} and have watched a certain sequence of quotes and trades. Many <em>true</em> world-states are consistent with that — every possible arrangement of the 30 cards you can't see, every possible goal suit not yet ruled out. All those distinct tree nodes form <strong>one information set \(I\)</strong>: the situations <em>you</em> experience as identical. A strategy can only condition on \(I\), never on the hidden truth — so it must assign <em>one distribution over actions per information set</em>. (This is the honest version of the POMDP hand-wave from §1: where PPO encodes the history into a vector and hopes, CFR reasons over the information set explicitly.)</p>
+  </div>
+
+  <p>A strategy \(\sigma_i\) maps each info set \(I\) to a distribution \(\sigma_i(I)\) over its legal actions. The solution concept is a <strong>Nash equilibrium</strong>: a strategy profile where no player can gain by unilaterally deviating — i.e. an <em>unexploitable</em> way to play. CFR is an algorithm that provably converges to one in two-player zero-sum games.</p>
+
+  <h3>The engine: regret matching</h3>
+  <p>Forget gradients. CFR is built on <em class="term">regret</em>: "how much better would I have done, in hindsight, had I always played action \(a\) here instead of my actual mixed strategy?" The algorithm is a loop:</p>
+  <ol>
+    <li>Play the current strategy through the tree.</li>
+    <li>At every information set, compute the regret of each action — counterfactually.</li>
+    <li>Accumulate those regrets over all iterations.</li>
+    <li>Set the next strategy <strong>proportional to positive accumulated regret</strong>. Actions you wish you'd played more get more probability.</li>
+  </ol>
+
+  <h4>Counterfactual value</h4>
+  <p>"Counterfactual" is the load-bearing word. The counterfactual value of info set \(I\) for player \(i\) weights each reachable terminal \(z\) by the probability that <em>everyone else</em> (and chance) plays to reach it — <strong>but treats player \(i\) as if they deliberately aimed to reach \(I\)</strong> (its own reach probability is factored out). This isolates "how good is being here, and what can I do about it," independent of how likely \(i\)'s own past play made reaching \(I\):</p>
+  \[ v_i(\sigma, I) \;=\; \sum_{z\in Z_I} \pi^\sigma_{-i}(z)\,\pi^\sigma(z[I]\!\to\! z)\,u_i(z), \]
+  <p>where \(\pi^\sigma_{-i}\) is the reach probability from everyone <em>but</em> \(i\), \(u_i(z)\) the payoff (chips), and \(Z_I\) the terminals through \(I\).</p>
+
+  <h4>Counterfactual regret &amp; the update</h4>
+  <p>The <strong>counterfactual regret</strong> of action \(a\) at \(I\) on iteration \(t\) is how much more counterfactual value you'd have gotten by committing to \(a\):</p>
+  \[ r^t(I,a) \;=\; v_i\big(\sigma^t_{I\to a},\,I\big) - v_i\big(\sigma^t, I\big), \qquad R^T(I,a) = \sum_{t=1}^{T} r^t(I,a). \]
+  <p>Then <strong>regret matching</strong> sets the next strategy proportional to positive cumulative regret (uniform if nothing is positive):</p>
+  \[ \sigma^{T+1}(I,a) = \frac{R^{T,+}(I,a)}{\sum_b R^{T,+}(I,b)}, \qquad R^{+}=\max(R,0). \]
+
+  <div class="box pitfall">
+    <div class="lbl">⚠ The strategy that converges is the AVERAGE, not the last one</div>
+    <p>This trips everyone up. The per-iteration strategies \(\sigma^t\) <em>oscillate</em> forever and do <strong>not</strong> individually approach equilibrium. The object that converges to Nash is the <strong>average strategy</strong> \(\bar\sigma^T(I,a)\propto\sum_t \pi_i^{\sigma^t}(I)\,\sigma^t(I,a)\) — the running, reach-weighted average of all strategies played. You must accumulate two tables per info set: cumulative regret (drives the next strategy) and the cumulative strategy (averaged at the end to read off the answer).</p>
+  </div>
+
+  <details>
+    <summary>Why minimising regret yields Nash (the one theorem to remember)</summary>
+    <div class="inner">
+      <p>Regret matching is a no-regret online-learning rule: at each info set, average regret \(\frac1T\sum_t r^t(I,a)\to 0\) as \(T\to\infty\) (it's bounded by \(O(1/\sqrt T)\)). The <em>counterfactual</em> construction's key lemma is that a player's total regret is bounded by the sum of their per-information-set counterfactual regrets — so minimising regret locally minimises it globally. Finally, a folk theorem of online learning: in a two-player zero-sum game, if <em>both</em> players have average regret \(\to 0\), their <strong>average strategies form a Nash equilibrium</strong> (the average exploitability is bounded by the sum of the two average regrets). Chain those three facts and you have CFR's guarantee.</p>
+    </div>
+  </details>
+
+  <h3>A concrete pass on micro-Figgie</h3>
+  <div class="box figgie">
+    <div class="lbl">🃏 One regret-matching update, by hand</div>
+    <p>Strip Figgie to a toy: at some information set \(I\) you may <code>BUY ♥</code>, <code>SELL ♥</code>, or <code>PASS</code>. Start uniform, \(\sigma^1=(\tfrac13,\tfrac13,\tfrac13)\). You traverse the tree and find the counterfactual values \(v(\text{buy})=+6\), \(v(\text{sell})=-2\), \(v(\text{pass})=0\), so the strategy's value is \(\tfrac13(6-2+0)=+1.33\). The instantaneous regrets are \(r(\text{buy})=6-1.33=+4.67\), \(r(\text{sell})=-2-1.33=-3.33\), \(r(\text{pass})=0-1.33=-1.33\). Only buy has positive cumulative regret, so</p>
+    <p style="margin:6px 0"><code>σ² = (BUY 1.0, SELL 0.0, PASS 0.0)</code> — pure buy next iteration.</p>
+    <p style="margin-bottom:0">Next iteration the world (and opponents) shift, buying ♥ may now be regretted, and the mix swings back. Over thousands of iterations the regrets balance and the <em>average</em> strategy settles into a stable, mixed, unexploitable way to trade hearts in that situation — perhaps <code>(BUY 0.55, PASS 0.35, SELL 0.10)</code>. That mixing is the bluff-like randomisation §2 promised you couldn't get from an argmax.</p>
+  </div>
+
+  <h3>Making CFR practical: sampling &amp; variants</h3>
+  <p>Vanilla CFR traverses the <em>entire</em> game tree every iteration — impossible for full Figgie (a continuous double auction has an astronomically large tree). The fixes:</p>
+  <ul>
+    <li><strong>Monte-Carlo CFR (MCCFR).</strong> Sample trajectories instead of full traversal. <em>External sampling</em> samples chance and opponents' actions, enumerating only the current player's; <em>outcome sampling</em> samples a single trajectory. Unbiased estimates of counterfactual regret, dramatically cheaper.</li>
+    <li><strong>CFR+.</strong> Floor cumulative regrets at zero (<code>regret-matching+</code>) and weight the strategy average linearly toward later iterations. Converges much faster in practice; powered the poker breakthroughs.</li>
+    <li><strong>Abstraction.</strong> Bucket similar information sets (similar hands/market states) into one, solve the smaller game, map back. Necessary to fit a game like Figgie into memory at all.</li>
+    <li><strong>Deep CFR.</strong> Replace the giant regret/strategy tables with <em>neural networks</em> that generalise across information sets — closing the loop back toward the function approximators PPO uses, but trained on the regret objective.</li>
+  </ul>
+
+  <h3>CFR vs. the policy-gradient family</h3>
+  <table>
+    <tr><th></th><th>PPO / GRPO (policy gradient)</th><th>CFR (regret minimisation)</th></tr>
+    <tr><td><strong>Origin</strong></td><td>stochastic optimisation</td><td>game theory / online learning</td></tr>
+    <tr><td><strong>Optimises</strong></td><td>expected return \(J(\theta)\)</td><td>(counterfactual) regret → 0</td></tr>
+    <tr><td><strong>Handles hidden info</strong></td><td>implicitly (encode history, hope)</td><td>explicitly (information sets)</td></tr>
+    <tr><td><strong>Convergence guarantee</strong></td><td>local optimum of \(J\); none vs. adaptive foe</td><td>Nash equilibrium (2p zero-sum)</td></tr>
+    <tr><td><strong>Output strategy</strong></td><td>the current network</td><td>the <em>average</em> strategy</td></tr>
+    <tr><td><strong>Scales to huge state via</strong></td><td>neural nets (native)</td><td>sampling + abstraction (or Deep CFR)</td></tr>
+  </table>
+
+  <div class="box key">
+    <div class="lbl">✦ CFR in one breath</div>
+    <p style="margin-bottom:0">Track, at every information set, how much you regret not having favoured each action; play next in proportion to positive cumulative regret; and report the <strong>time-average</strong> strategy. In two-player zero-sum games that average provably converges to an <strong>unexploitable Nash equilibrium</strong> — giving you, unlike a raw policy gradient, a guarantee that no opponent can systematically beat your Figgie play.</p>
+  </div>
+</section>
+
+<!-- ════════════ 9. DEEP CFR ════════════ -->
+<section id="deepcfr" class="major">
+  <div class="h2num">SECTION 9 · KEY ALGORITHM</div>
+  <h2>Deep CFR: CFR meets function approximation</h2>
+
+  <p>Tabular CFR has a fatal scaling problem on a game like Figgie, and <strong>Deep CFR</strong> (Brown, Lerer, Gross &amp; Sandholm, 2019) is the fix that finally lets CFR's equilibrium guarantee ride on the same neural machinery that PPO uses. This chapter is where the two halves of the document — game-theoretic regret minimisation and deep function approximation — finally fuse.</p>
+
+  <h3>The wall tabular CFR hits</h3>
+  <p>Recall §8: CFR keeps, for <em>every information set</em> \(I\), two tables — cumulative regret \(R(I,a)\) and the cumulative strategy. That is fine for toy games. Full Figgie is hopeless:</p>
+  <ul>
+    <li>An information set is "your hand + the entire observed market history." The number of distinct hands alone is enormous, and each is multiplied by every possible sequence of quotes and trades you could have watched.</li>
+    <li>You would need to <em>visit</em> each information set many times to estimate its regret — but the vast majority are never seen twice, so the tables never fill in.</li>
+  </ul>
+  <p>The classical workaround is <strong>abstraction</strong>: hand-design buckets that lump "similar" hands and market states into one information set, solve the shrunken game, map back. It works (it powered early poker bots) but it is lossy, brittle, and demands deep domain expertise to design the buckets. Deep CFR's thesis: <strong>don't hand-design buckets — let a neural network learn to generalise across information sets automatically.</strong></p>
+
+  <div class="box intuition">
+    <div class="lbl">💡 The one-line idea</div>
+    <p style="margin-bottom:0">Deep CFR is to CFR what deep \(Q\)-learning is to tabular \(Q\)-learning, and what PPO's policy net is to a tabular policy: <strong>replace the giant lookup tables with function approximators.</strong> Instead of storing a regret number per \((I,a)\) cell, train a network \(R_\psi(I)\) that <em>predicts</em> the regret vector from features of \(I\). Two hands that play similarly get similar predictions <em>without either being visited</em> — generalisation does the work abstraction used to.</p>
+  </div>
+
+  <h3>The two networks</h3>
+  <p>Deep CFR trains (per player \(p\)) two kinds of network, replacing the two CFR tables:</p>
+  <ul>
+    <li><strong>Advantage / regret network</strong> \(R_\psi^p(I,a)\). Takes the features of an information set, outputs a value per legal action that approximates the <em>cumulative counterfactual regret</em> (more precisely its iteration-average — regret matching is scale-invariant, so predicting the average is equivalent and numerically nicer). The <em>current</em> strategy at any \(I\) is just <strong>regret matching on this network's output</strong>: \(\sigma(I,a)\propto R_\psi^p(I,a)^{+}\).</li>
+    <li><strong>Average-strategy network</strong> \(\Pi_\phi(I,a)\). Approximates the running average strategy \(\bar\sigma\) — the object that actually converges to Nash (the §8 pitfall: it's the <em>average</em>, never the last iterate). This network is the <strong>final deliverable</strong> you deploy to play Figgie.</li>
+  </ul>
+
+  <h3>The training loop</h3>
+  <p>Because traversing the whole tree is impossible, Deep CFR rides on <strong>external-sampling Monte-Carlo CFR</strong> (§8): sample chance and the opponents' moves, enumerate only the traverser's actions. Each CFR iteration \(t\):</p>
+  <ol>
+    <li><strong>Traverse.</strong> For the traverser \(p\), run \(K\) external-sampling traversals. The strategy used at each visited \(I\) is regret matching on the <em>current</em> advantage network \(R_\psi^p\).</li>
+    <li><strong>Collect regret targets.</strong> At every information set visited, compute the sampled instantaneous counterfactual regret vector \(\tilde r^t(I,\cdot)\), and push the sample \(\big(I,\ t,\ \tilde r^t(I,\cdot)\big)\) into a fixed-size <em>advantage memory</em> \(\mathcal M_v^p\) using <strong>reservoir sampling</strong> (so the buffer always holds a uniform sample of everything seen so far, despite finite size).</li>
+    <li><strong>Collect strategy targets.</strong> Push \(\big(I,\ t,\ \sigma^t(I,\cdot)\big)\) into a separate <em>strategy memory</em> \(\mathcal M_\Pi\) — the raw material for the average-strategy network.</li>
+    <li><strong>Retrain from scratch.</strong> Re-initialise \(R_\psi^p\) and fit it (regression) to the regrets in \(\mathcal M_v^p\), weighting each sample by its iteration \(t\) (this is the <em>Linear CFR</em> weighting — later iterations matter more). <strong>Training from scratch each time is deliberate</strong>: the target is a cumulative quantity that shifts, and warm-starting biases the fit.</li>
+  </ol>
+  <p>After \(T\) iterations, train \(\Pi_\phi\) once on \(\mathcal M_\Pi\) (again \(t\)-weighted) to recover \(\bar\sigma\). That network is your approximate Nash strategy.</p>
+
+  <pre><code><span class="c"># Deep CFR, one player's iteration (external sampling)</span>
+<span class="k">for</span> t <span class="k">in</span> range(T):
+    <span class="k">for</span> p <span class="k">in</span> players:
+        <span class="k">for</span> k <span class="k">in</span> range(K):                     <span class="c"># K sampled traversals</span>
+            traverse(root, traverser=p,
+                     strategy=<span class="k">lambda</span> I: regret_match(R_psi[p](I)),  <span class="c"># σ from net</span>
+                     on_visit=<span class="k">lambda</span> I, r_hat: M_v[p].<span class="f">add</span>((I, t, r_hat)),   <span class="c"># reservoir</span>
+                     on_strat=<span class="k">lambda</span> I, sigma: M_pi.<span class="f">add</span>((I, t, sigma)))
+        R_psi[p] = train_from_scratch(M_v[p], weight_by=t)      <span class="c"># Linear CFR</span>
+
+avg_strategy_net = train_from_scratch(M_pi, weight_by=t)        <span class="c"># ← deploy this</span></code></pre>
+
+  <div class="box figgie">
+    <div class="lbl">🃏 What this buys you on Figgie</div>
+    <p>You never enumerate Figgie's information sets. You play sampled games; at each decision the advantage network reads your hand + market history and outputs a regret estimate per action (<code>BUY ♥</code>, <code>QUOTE_ASK(♦,8)</code>, …); regret matching turns that into the mixed strategy you actually play; and the visited situations become regression targets. A hand you have <em>never</em> held gets a sensible regret prediction because it <em>looks like</em> hands the net has seen — the generalisation that hand-built abstraction could only approximate. Crucially, you can reuse the very same <code>FiggieTransformer</code> trunk from the PPO setup: same token-sequence encoder of the game history, but with a regret-regression head and a CFR target instead of a clipped policy-gradient loss.</p>
+  </div>
+
+  <h3>How Deep CFR differs from PPO/GRPO — and why it's worth the trouble</h3>
+  <table>
+    <tr><th></th><th>PPO / GRPO</th><th>Deep CFR</th></tr>
+    <tr><td><strong>What the net predicts</strong></td><td>action probabilities (&amp; value)</td><td>per-action <em>regret</em> (+ a 2nd net for avg strategy)</td></tr>
+    <tr><td><strong>Training target</strong></td><td>clipped advantage-weighted gradient</td><td>regression onto sampled counterfactual regret</td></tr>
+    <tr><td><strong>Strategy comes from</strong></td><td>the net's softmax, directly</td><td>regret matching on the net's output</td></tr>
+    <tr><td><strong>What converges</strong></td><td>the current weights (no game-theoretic guarantee)</td><td>the <em>average-strategy</em> net → Nash (with approx. error)</td></tr>
+    <tr><td><strong>Hidden information</strong></td><td>encoded into history, implicit</td><td>first-class via information sets &amp; counterfactual values</td></tr>
+    <tr><td><strong>Memory machinery</strong></td><td>a rollout buffer, reused a few epochs</td><td>reservoir-sampled advantage &amp; strategy memories</td></tr>
+  </table>
+
+  <div class="box pitfall">
+    <div class="lbl">⚠ The catches</div>
+    <p>Deep CFR's convergence guarantee is now <em>approximate</em> — it degrades with the networks' regression error, so a badly-fit advantage net no longer provably approaches Nash. It needs large reservoir memories and a full network re-fit every iteration (expensive). And the two-network bookkeeping (advantage + average-strategy, per player) is heavier than a single PPO policy. These costs are why later work compressed it: <strong>Single Deep CFR</strong> drops the separate average-strategy net; <strong>DREAM</strong> and <strong>ARMAC</strong> fold the regret estimate into an actor–critic-style single-trajectory method, pulling Deep CFR much closer to the policy-gradient world you already know.</p>
+  </div>
+
+  <div class="box key">
+    <div class="lbl">✦ Deep CFR in one breath</div>
+    <p style="margin-bottom:0">Run Monte-Carlo CFR, but store the regrets it produces as <em>training data</em> and learn a network to predict regret from any information set — so generalisation replaces hand-built abstraction, and a game far too large to tabulate (like real Figgie) becomes tractable. You keep CFR's prize — convergence toward an <strong>unexploitable</strong> strategy — while gaining the scalability of the deep nets that power PPO. It is, quite literally, the bridge between the two families this document has been building toward.</p>
+  </div>
+</section>
+
+<!-- ════════════ 10. COMPARE ════════════ -->
+<section id="compare" class="major">
+  <div class="h2num">SECTION 10</div>
+  <h2>So which do you use for Figgie?</h2>
+
+  <p>You now have three tools and a feel for their shapes. The honest answer is that they occupy different niches, and a strong Figgie agent might borrow from all of them.</p>
+
+  <h4>The case for PPO / GRPO (what FiggieRL does)</h4>
+  <p>The action space is large and structured, the state is a long history best handled by a Transformer, and you want to <em>scale</em> with compute. Policy gradients eat all of this natively. PPO gives you stable, sample-reusable updates; the group structure of GRPO cancels the dominant variance source (the deal). With a self-play snapshot pool to keep the opponent distribution rich, this is the pragmatic, scalable path — and it's exactly the design in <span class="pill repo">figgie/</span>. Its weakness is principled: it chases a moving target and carries no guarantee of unexploitability.</p>
+
+  <h4>The case for CFR</h4>
+  <p>If your goal is a <em>provably</em> hard-to-exploit strategy and you're willing to abstract Figgie down to a tractable game, CFR (CFR+/MCCFR, or Deep CFR to keep the neural generalisation) targets the right object — Nash — and treats hidden information as a first-class citizen rather than something to encode and hope about. Its weakness is equally principled: full Figgie's game tree forces heavy abstraction, and "unexploitable" is not the same as "maximally exploits weak opponents."</p>
+
+  <div class="box intuition">
+    <div class="lbl">💡 The honest synthesis</div>
+    <p style="margin-bottom:0">They optimise different things. PPO/GRPO maximise <strong>expected profit against the opponents you actually train on</strong> — superb for exploiting a known field, at the risk of being exploited back. CFR minimises <strong>worst-case exploitability</strong> — a safety floor, sometimes leaving money on the table against bad players. The frontier of game AI (e.g. ReBeL, player-of-games) <em>combines</em> them: CFR-style equilibrium reasoning for soundness, deep nets and gradient learning for scale. For FiggieRL today, PPO+GAE with GRPO-style grouped self-play is the right engine; understanding CFR tells you precisely what guarantee that engine is and isn't giving you.</p>
+  </div>
+
+  <hr class="soft"/>
+
+  <h3>The whole document on one page</h3>
+  <table>
+    <tr><th>Method</th><th>One-line idea</th><th>Advantage estimate</th><th>Key risk</th></tr>
+    <tr><td><strong>REINFORCE</strong></td><td>reinforce actions by return-to-go</td><td>\(G_t\) (raw MC)</td><td>crippling variance</td></tr>
+    <tr><td><strong>+ baseline</strong></td><td>subtract expected return</td><td>\(G_t-b(s_t)\)</td><td>need a good \(b\)</td></tr>
+    <tr><td><strong>Actor–Critic</strong></td><td>learn the baseline as \(V_\phi\)</td><td>\(\delta_t\) / GAE</td><td>biased if critic wrong</td></tr>
+    <tr><td><strong>PPO</strong></td><td>reuse data safely via clipped ratio</td><td>GAE \((\gamma,\lambda)\)</td><td>tuning, critic quality</td></tr>
+    <tr><td><strong>GRPO</strong></td><td>group mean replaces the critic</td><td>\((R_i-\bar R)/\sigma\)</td><td>coarse credit; \(G\) rollouts</td></tr>
+    <tr><td><strong>CFR</strong></td><td>play proportional to regret; average it</td><td>counterfactual regret</td><td>tree size → abstraction</td></tr>
+  </table>
+</section>
+
+<!-- ════════════ 10. REFS ════════════ -->
+<section id="refs" class="major">
+  <div class="h2num">SECTION 11</div>
+  <h2>References &amp; where to go next</h2>
+  <ul style="font-size:16px;">
+    <li><strong>Williams (1992)</strong>, <em>Simple statistical gradient-following algorithms for connectionist RL</em> — the original REINFORCE.</li>
+    <li><strong>Sutton, McAllester, Singh &amp; Mansour (2000)</strong>, <em>Policy Gradient Methods for RL with Function Approximation</em> — the policy gradient theorem.</li>
+    <li><strong>Schulman et al. (2016)</strong>, <em>High-Dimensional Continuous Control Using Generalized Advantage Estimation</em> — GAE.</li>
+    <li><strong>Schulman et al. (2017)</strong>, <em>Proximal Policy Optimization Algorithms</em> — PPO and the clipped objective.</li>
+    <li><strong>Shao / DeepSeek (2024)</strong>, <em>DeepSeekMath</em> &amp; the DeepSeek-R1 report — GRPO.</li>
+    <li><strong>Zinkevich, Johanson, Bowling &amp; Piccione (2007)</strong>, <em>Regret Minimization in Games with Incomplete Information</em> — the CFR paper.</li>
+    <li><strong>Lanctot et al. (2009)</strong> — MCCFR; <strong>Tammelin (2014)</strong> — CFR+; <strong>Brown &amp; Sandholm</strong> — Libratus/Pluribus; <strong>Brown et al. (2019)</strong> — Deep CFR.</li>
+    <li><strong>Spinning Up in Deep RL</strong> (OpenAI) — the best hands-on companion for §§3–6.</li>
+  </ul>
+  <p style="margin-top:36px;color:var(--ink-faint);font-family:var(--sans);font-size:14px;border-top:1px solid var(--line);padding-top:20px;">
+    Written for the FiggieRL project · examples mirror the <code>figgie/</code> library (Transformer actor–critic, PPO + GAE, group-structured self-play, Muon optimiser). The fastest way to cement all of this: open <code>figgie/train.py</code> and match every term in <code>ppo_loss_batched</code> to a line in §§5–7.
+  </p>
+</section>
+
+</div>
+</main>
+</div>
+
+<script>
+  // reading progress
+  const prog = document.getElementById('progress');
+  const onScroll = () => {
+    const h = document.documentElement;
+    const max = h.scrollHeight - h.clientHeight;
+    prog.style.width = (max > 0 ? (h.scrollTop / max) * 100 : 0) + '%';
+  };
+  document.addEventListener('scroll', onScroll, { passive:true });
+
+  // scroll-spy TOC
+  const links = Array.from(document.querySelectorAll('nav.toc a.top'));
+  const map = new Map();
+  links.forEach(a => { const id = a.getAttribute('href').slice(1); const s = document.getElementById(id); if (s) map.set(s, a); });
+  const obs = new IntersectionObserver((entries) => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        links.forEach(l => l.classList.remove('active'));
+        const a = map.get(e.target);
+        if (a) a.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-15% 0px -75% 0px', threshold: 0 });
+  map.forEach((_, sec) => obs.observe(sec));
+  onScroll();
+</script>
+</body>
+</html>
